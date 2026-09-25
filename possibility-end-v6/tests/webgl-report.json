@@ -1,0 +1,76 @@
+{
+  "environment": "Headed Chromium / ANGLE SwiftShader (software WebGL, not a device benchmark)",
+  "checks": [
+    {
+      "name": "Original live WebGL renderer compiles and starts",
+      "pass": true,
+      "details": {
+        "active": true,
+        "time": 0.005634920634920881,
+        "started": true,
+        "finished": false,
+        "paused": false,
+        "still": false,
+        "renderer": "webgl",
+        "particles": 42000,
+        "frames": 10,
+        "yaw": 0.12,
+        "pitch": 0.85,
+        "reduced": false,
+        "entrance": 1,
+        "buffer": [
+          1131,
+          795
+        ]
+      }
+    },
+    {
+      "name": "Full-screen projection reaches the normal camera scale",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "Final words remain available",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "Return light follows the actual final-universe center",
+      "pass": true,
+      "details": {
+        "phase": "returning",
+        "error": 0.01721714038053493,
+        "textOpacity": "0"
+      }
+    },
+    {
+      "name": "Finale text dissolves during return",
+      "pass": true,
+      "details": {
+        "phase": "returning",
+        "error": 0.01721714038053493,
+        "textOpacity": "0"
+      }
+    },
+    {
+      "name": "WebGL return restores the reading position",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "WebGL is stopped after return",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "No uncaught WebGL/JavaScript test errors",
+      "pass": true,
+      "details": []
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "passed": 8,
+    "total": 8
+  }
+}

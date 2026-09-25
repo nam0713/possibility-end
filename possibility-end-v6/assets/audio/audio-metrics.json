@@ -1,0 +1,22 @@
+{
+  "horizon": {
+    "duration": 96.0,
+    "sample_rate": 32000,
+    "channels": 2,
+    "peak_dbfs": -9.447,
+    "rms_dbfs": -23.5,
+    "loop": true,
+    "bytes": 1921004
+  },
+  "first-light": {
+    "duration": 39.0,
+    "sample_rate": 32000,
+    "channels": 2,
+    "peak_dbfs": -2.2,
+    "rms_dbfs": -20.596,
+    "loop": false,
+    "bytes": 781004
+  },
+  "composition": "Original procedural ambient score, no third-party audio",
+  "impact_seconds": 3.6
+}

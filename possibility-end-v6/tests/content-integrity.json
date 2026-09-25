@@ -1,0 +1,22 @@
+[
+  {
+    "file": "src/manuscript.txt",
+    "sha256": "129dc237240ce3bd90c9dd4d408957031c9a7e39104542110404e27cf9e13ba5",
+    "identical_to_v5": true
+  },
+  {
+    "file": "src/chapters.json",
+    "sha256": "2d59b76315c23719d06f965d18f9a5b538862bdfd80fd402cc63f8842ebcafe9",
+    "identical_to_v5": true
+  },
+  {
+    "file": "assets/audio/horizon.mp3",
+    "sha256": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e",
+    "identical_to_v5": true
+  },
+  {
+    "file": "assets/audio/first-light.mp3",
+    "sha256": "4555ffe7fe255a53167a8a2e2cfbca7688c4873e321073659debb6cf89532e7b",
+    "identical_to_v5": true
+  }
+]

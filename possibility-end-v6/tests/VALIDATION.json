@@ -1,0 +1,21 @@
+{
+  "version": "6.0.0",
+  "html_sha256": "4f5e97963c760d735140bfc51a0f61c9cf2fa294a631ed945d4dc57fe77b3352",
+  "main_browser_checks": {
+    "passed": 65,
+    "total": 65
+  },
+  "headed_webgl_checks": {
+    "passed": 8,
+    "total": 8
+  },
+  "node_server_returns_identical_html": true,
+  "physical_mobile_devices_tested": false,
+  "Safari_tested": false,
+  "remote_deployment_performed": false,
+  "preview": {
+    "file": "possibility-end-v6-transition.mp4",
+    "method": "Samples of the actual browser-rendered transition frames, at 24 frames per second. Test-only frame access is injected into the preview document; the shipped HTML is unchanged. Not an FPS benchmark.",
+    "sound": false
+  }
+}

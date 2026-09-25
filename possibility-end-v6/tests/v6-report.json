@@ -1,0 +1,396 @@
+{
+  "environment": "Chromium / exact generated document via set_content",
+  "checks": [
+    {
+      "name": "Default sound intent is on",
+      "pass": true
+    },
+    {
+      "name": "Ordinary story click plays the embedded score without a sound opt-in",
+      "pass": true,
+      "details": {
+        "enabled": true,
+        "choice": null,
+        "volume": 0.45,
+        "mode": "reader",
+        "status": "idle",
+        "context": "running",
+        "loaded": true,
+        "loading": false,
+        "error": "",
+        "scoreTime": null,
+        "scoreActive": false,
+        "ambientActive": true,
+        "outputRms": 0.010057692406115003,
+        "ambientDuration": 96,
+        "endingDuration": 38.999977324263035
+      }
+    },
+    {
+      "name": "Chapter 1: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 2: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 3: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 4: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 5: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 6: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 7: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "Chapter 8: all original text blocks",
+      "pass": true
+    },
+    {
+      "name": "No ending shortcut in the persistent navigation",
+      "pass": true
+    },
+    {
+      "name": "The last action contains only a narrative sentence",
+      "pass": true
+    },
+    {
+      "name": "Explanatory ending-launch card removed",
+      "pass": true
+    },
+    {
+      "name": "No separate ending page links",
+      "pass": true
+    },
+    {
+      "name": "dark: navigation and settings use the reading surface color",
+      "pass": true,
+      "details": {
+        "reader": "#0b0b0b",
+        "settings": "rgb(11, 11, 11)",
+        "menu": "rgb(11, 11, 11)",
+        "bar": "rgb(11, 11, 11)"
+      }
+    },
+    {
+      "name": "dark: selected chapter has no legacy orange ink",
+      "pass": true
+    },
+    {
+      "name": "paper: navigation and settings use the reading surface color",
+      "pass": true,
+      "details": {
+        "reader": "#0b0b0b",
+        "settings": "rgb(11, 11, 11)",
+        "menu": "rgb(11, 11, 11)",
+        "bar": "rgb(11, 11, 11)"
+      }
+    },
+    {
+      "name": "paper: selected chapter has no legacy orange ink",
+      "pass": true
+    },
+    {
+      "name": "light: navigation and settings use the reading surface color",
+      "pass": true,
+      "details": {
+        "reader": "#fafaf7",
+        "settings": "rgb(250, 250, 247)",
+        "menu": "rgb(250, 250, 247)",
+        "bar": "rgb(250, 250, 247)"
+      }
+    },
+    {
+      "name": "light: selected chapter has no legacy orange ink",
+      "pass": true
+    },
+    {
+      "name": "Entry is an overlapping scene animation, not an instant replacement",
+      "pass": true,
+      "details": {
+        "state": {
+          "phase": "entering",
+          "progress": 0.2936038095238092,
+          "navigationBusy": false,
+          "origin": [
+            0.49609375,
+            0.5763020833333333
+          ]
+        },
+        "alpha": "0.125152",
+        "article": "0.853624",
+        "backdrop": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "name": "No opaque modal backdrop cuts in",
+      "pass": true,
+      "details": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "name": "Entry retains URL, history and scroll",
+      "pass": true,
+      "details": {
+        "before": {
+          "url": "about:blank#chapter-8",
+          "y": 10825,
+          "history": 11,
+          "view": "reader"
+        },
+        "after": {
+          "url": "about:blank#chapter-8",
+          "y": 10825,
+          "history": 11,
+          "view": "reader"
+        }
+      }
+    },
+    {
+      "name": "The source sentence remains underneath, rather than being replaced",
+      "pass": true
+    },
+    {
+      "name": "Ending fills viewport",
+      "pass": true
+    },
+    {
+      "name": "Ending score output exists",
+      "pass": true
+    },
+    {
+      "name": "Sound and film share time",
+      "pass": true
+    },
+    {
+      "name": "Pause holds film",
+      "pass": true
+    },
+    {
+      "name": "Resume preserves score continuity",
+      "pass": true
+    },
+    {
+      "name": "Exit is a reverse overlapping scene animation",
+      "pass": true,
+      "details": {
+        "state": {
+          "phase": "returning",
+          "progress": 0.5686470588235298,
+          "navigationBusy": false,
+          "origin": [
+            0.49609375,
+            0.5763020833333333
+          ]
+        },
+        "alpha": "0.578589",
+        "article": "0.319051"
+      }
+    },
+    {
+      "name": "Return restores the exact reading location",
+      "pass": true
+    },
+    {
+      "name": "Keyboard focus returns to the light",
+      "pass": true
+    },
+    {
+      "name": "Return disposes of ending playback",
+      "pass": true
+    },
+    {
+      "name": "Escape during entry cancels the future start",
+      "pass": true
+    },
+    {
+      "name": "Cancellation still restores scroll and focus",
+      "pass": true
+    },
+    {
+      "name": "Explicit mute overrides default-on",
+      "pass": true
+    },
+    {
+      "name": "A muted ending still advances visually",
+      "pass": true
+    },
+    {
+      "name": "No ending participation or audio choice is persisted",
+      "pass": true
+    },
+    {
+      "name": "320px: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "320px: themed menu stays within screen",
+      "pass": true,
+      "details": {
+        "x": 17,
+        "y": 12,
+        "width": 276,
+        "height": 716
+      }
+    },
+    {
+      "name": "320px: ending covers the viewport",
+      "pass": true
+    },
+    {
+      "name": "320px: reading position survives the round trip",
+      "pass": true
+    },
+    {
+      "name": "390px: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "390px: themed menu stays within screen",
+      "pass": true,
+      "details": {
+        "x": 17,
+        "y": 47.5,
+        "width": 346,
+        "height": 749
+      }
+    },
+    {
+      "name": "390px: ending covers the viewport",
+      "pass": true
+    },
+    {
+      "name": "390px: reading position survives the round trip",
+      "pass": true
+    },
+    {
+      "name": "768px: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "768px: themed menu stays within screen",
+      "pass": true,
+      "details": {
+        "x": 20,
+        "y": 106,
+        "width": 718,
+        "height": 812
+      }
+    },
+    {
+      "name": "768px: ending covers the viewport",
+      "pass": true
+    },
+    {
+      "name": "768px: reading position survives the round trip",
+      "pass": true
+    },
+    {
+      "name": "1440px: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "1440px: themed menu stays within screen",
+      "pass": true,
+      "details": {
+        "x": 290,
+        "y": 94,
+        "width": 850,
+        "height": 812
+      }
+    },
+    {
+      "name": "1440px: ending covers the viewport",
+      "pass": true
+    },
+    {
+      "name": "1440px: reading position survives the round trip",
+      "pass": true
+    },
+    {
+      "name": "1920px: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "1920px: themed menu stays within screen",
+      "pass": true,
+      "details": {
+        "x": 530,
+        "y": 134,
+        "width": 850,
+        "height": 812
+      }
+    },
+    {
+      "name": "1920px: ending covers the viewport",
+      "pass": true
+    },
+    {
+      "name": "1920px: reading position survives the round trip",
+      "pass": true
+    },
+    {
+      "name": "Simulated autoplay block keeps on-intent without producing output",
+      "pass": true,
+      "details": {
+        "enabled": true,
+        "choice": null,
+        "volume": 0.45,
+        "mode": "home",
+        "status": "idle",
+        "context": "suspended",
+        "loaded": true,
+        "loading": false,
+        "error": "",
+        "scoreTime": null,
+        "scoreActive": false,
+        "ambientActive": false,
+        "outputRms": 0,
+        "ambientDuration": 96,
+        "endingDuration": 38.999977324263035
+      }
+    },
+    {
+      "name": "First trusted story click releases a blocked context",
+      "pass": true
+    },
+    {
+      "name": "Mute before autoplay unlock cannot freeze the ending",
+      "pass": true
+    },
+    {
+      "name": "Reduced-motion opens a static finale",
+      "pass": true
+    },
+    {
+      "name": "Reduced-motion avoids explosion audio",
+      "pass": true
+    },
+    {
+      "name": "Missing Web Audio never blocks story or ending",
+      "pass": true
+    },
+    {
+      "name": "No uncaught JavaScript exceptions or test interruptions",
+      "pass": true,
+      "details": []
+    }
+  ],
+  "errors": [],
+  "html_sha256": "4f5e97963c760d735140bfc51a0f61c9cf2fa294a631ed945d4dc57fe77b3352",
+  "summary": {
+    "passed": 65,
+    "total": 65
+  }
+}

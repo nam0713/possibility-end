@@ -1,0 +1,112 @@
+/* V6: a single chromatic system and a continuous reading/film surface. */
+:root{--ui-bg:#0b0b0b;--ui-fg:#e3e3df;--ui-muted:#979793;--ui-line:#2c2c29;--ui-hover:rgba(255,255,255,.045)}
+html{scrollbar-gutter:stable;color-scheme:dark}
+body[data-view="reader"]{--ui-bg:var(--reader-bg);--ui-fg:var(--reader-ink);--ui-muted:var(--reader-muted);--ui-line:var(--reader-line)}
+body[data-view="reader"]:not([data-reader-theme="dark"]){color-scheme:light;--ui-hover:rgba(0,0,0,.045)}
+body{accent-color:var(--ui-fg)}
+button:focus-visible,a:focus-visible{outline-color:var(--ui-fg)}
+/* The navigation is part of the book, not an unrelated light-colored application. */
+#contents-dialog,#settings-dialog{background:var(--ui-bg);color:var(--ui-fg);border:1px solid var(--ui-line);border-radius:4px;box-shadow:0 24px 100px #0007;color-scheme:inherit}
+#contents-dialog .dialog-top,#contents-dialog .chapter-row,#settings-dialog .font-size-controls,#settings-dialog .segmented-control,#settings-dialog .theme-options button{border-color:var(--ui-line)}
+#contents-dialog .dialog-heading h2,#settings-dialog .settings-header h2{font-weight:400;letter-spacing:-.04em}
+#contents-dialog .close-button,#settings-dialog .close-button,#contents-dialog .dialog-heading .eyebrow,#contents-dialog .dialog-heading>.mono,#contents-dialog .dialog-footer{color:var(--ui-muted)}
+#dialog-chapters .chapter-row,#dialog-chapters .row-title{color:var(--ui-fg);background:transparent}
+#dialog-chapters .row-number,#dialog-chapters .row-en,#dialog-chapters .row-arrow{color:var(--ui-muted)}
+#dialog-chapters .chapter-row:hover,#dialog-chapters .chapter-row:focus-visible,#dialog-chapters .chapter-row[aria-current="page"]{background:var(--ui-hover);color:var(--ui-fg)}
+#dialog-chapters .chapter-row[aria-current="page"] .row-number{color:var(--ui-fg)}
+#dialog-chapters .chapter-row[aria-current="page"]:before{content:"";position:absolute;left:-15px;top:calc(50% - 2px);width:4px;height:4px;background:var(--ui-fg);border-radius:50%}
+#settings-dialog legend,#settings-dialog .reader-audio-note,#settings-dialog .settings-intro,#settings-dialog .settings-storage{color:var(--ui-muted)}
+#settings-dialog .segmented-control button[aria-pressed="true"]{background:var(--ui-hover);color:var(--ui-fg);box-shadow:inset 0 -1px var(--ui-fg)}
+#settings-dialog .theme-options button[aria-pressed="true"]{border-color:var(--ui-fg);box-shadow:inset 0 0 0 1px var(--ui-fg)}
+#settings-dialog .settings-preview{border-color:var(--ui-line)}
+#settings-dialog .theme-swatch{border-color:var(--ui-muted)}
+.reader-bottom-bar,.reader-toolbar{background:var(--reader-bg);color:var(--reader-ink);border-color:var(--reader-line)}
+body[data-reader-theme] .next-chapter-link .next-arrow,body[data-reader-theme] .reader-position span,#bookmark-button[aria-pressed="true"]{color:var(--ui-fg)}
+.end-actions,.next-chapter-link{color:var(--ui-fg);border-color:var(--ui-line)}
+body[data-reader-theme] .reading-progress span{background:var(--ui-fg)}
+.toast{background:var(--ui-bg);color:var(--ui-fg);border:1px solid var(--ui-line);border-radius:3px}
+.sound-control{--sound-text:var(--ui-muted);--sound-bg:var(--ui-bg);--sound-border:var(--ui-line)}
+.sound-panel{border-radius:3px}
+.sound-toggle{width:38px;justify-content:center}
+.sound-toggle>[data-audio-label]{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+.sound-toggle.is-on{color:var(--ui-fg)}
+.sound-panel p,.settings-intro,.reader-audio-note,.settings-storage,.autosave-label,.preview-foot{display:none}
+input[data-audio-volume]::-webkit-slider-runnable-track{background:var(--ui-line)}
+input[data-audio-volume]::-moz-range-track{background:var(--ui-line)}
+input[data-audio-volume]::-webkit-slider-thumb{background:var(--ui-fg)}
+input[data-audio-volume]::-moz-range-thumb{background:var(--ui-fg)}
+.chapter-drag-hint,.cosmos-help small,.universe-heading p,.hero-controls>.mono,.preview-figure .mini-caption{display:none}
+.chapter-space-controls{opacity:.5;transition:opacity .25s}
+.chapter-space-controls:hover,.chapter-space-controls:focus-within{opacity:1}
+.reading-aside>.eyebrow{display:none}
+.chapter-cover-meta{opacity:.75}
+.chapter-end>.eyebrow{color:var(--ui-muted);letter-spacing:.09em;font-size:10px}
+.chapter-end[data-last="true"]{max-width:none;margin:0;padding:0;border:0}
+/* A sentence and a point of light. No menu, launch card, or instruction block. */
+.continuum{position:relative;display:flex;align-items:center;justify-content:center;min-height:76svh;padding:80px 24px 135px;isolation:isolate}
+.continuum:before{content:"";position:absolute;inset:3% 0 0;background:radial-gradient(ellipse at 50% 57%,rgba(89,113,144,.075),transparent 58%);pointer-events:none}
+.continuum-trigger{position:relative;display:flex;flex-direction:column;align-items:center;gap:42px;width:min(100%,680px);padding:30px 20px;border:0;background:transparent;border-radius:0;min-height:240px;cursor:pointer;color:var(--reader-ink)}
+.continuum-line{font:400 clamp(22px,2.5vw,36px)/1.7 var(--sans);letter-spacing:-.045em;pointer-events:none}
+.continuum-star{position:relative;display:block;width:96px;height:96px;pointer-events:none}
+.seed-core{position:absolute;left:calc(50% - 2px);top:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:#f2f7ff;box-shadow:0 0 9px 2px #dde9ff88,0 0 38px 9px #86a8e34a,0 0 95px 22px #7292b924;transition:box-shadow .7s}
+.continuum-star:before,.continuum-star:after{content:"";position:absolute;top:50%;left:50%;width:80px;height:1px;background:linear-gradient(90deg,transparent,#d0e2ff55,transparent);transform:translate(-50%,-50%) rotate(-17deg);transition:width .7s,opacity .7s;opacity:.65}
+.continuum-star:after{width:42px;transform:translate(-50%,-50%) rotate(73deg);opacity:.4}
+.continuum-trigger:hover .seed-core,.continuum-trigger:focus-visible .seed-core{box-shadow:0 0 12px 3px #e6edffb3,0 0 62px 17px #86a8e35e,0 0 120px 30px #7292b925}
+.continuum-trigger:hover .continuum-star:before{width:112px;opacity:.9}
+body[data-reader-theme="paper"] .seed-core,body[data-reader-theme="light"] .seed-core{background:#596c88;box-shadow:0 0 11px 2px #778dac66,0 0 35px 7px #72809c35}
+/* The dialog's top layer starts genuinely transparent. The source is never replaced. */
+#ending-view{background:transparent;color-scheme:dark;--ui-bg:#0b0c10;--ui-fg:#e3e7ed;--ui-muted:#9cabbc;--ui-line:#333a45}
+#ending-view::backdrop{background:transparent;backdrop-filter:none}
+#ending-view #bigbang-canvas,#ending-view .ending-vignette{opacity:var(--scene-alpha,1)}
+#ending-view .ending-intro,#ending-view .ending-phase,#ending-view .ending-mode-label{display:none!important}
+.transition-core{position:absolute;width:4px;height:4px;z-index:9;border-radius:50%;background:#f2f7ff;box-shadow:0 0 10px 2px #dde9ff88,0 0 40px 10px #86a8e34a,0 0 100px 22px #7292b924;pointer-events:none;opacity:0}
+.transition-verse{position:absolute;z-index:9;white-space:nowrap;pointer-events:none;opacity:0}
+#ending-view.is-entering .ending-header,#ending-view.is-entering .ending-controls,#ending-view.is-entering .ending-timeline,#ending-view.is-entering .ending-finale,
+#ending-view.is-returning .ending-header,#ending-view.is-returning .ending-controls,#ending-view.is-returning .ending-timeline,#ending-view.is-returning .ending-finale{opacity:0;pointer-events:none}
+.ending-header,.ending-controls,.ending-timeline{transition:opacity .6s ease}
+#ending-view.cinema-idle .ending-header,#ending-view.cinema-idle .ending-controls,#ending-view.cinema-idle .ending-timeline{opacity:0;pointer-events:none}
+#ending-view.cinema-idle .ending-header:focus-within,#ending-view.cinema-idle .ending-controls:focus-within{opacity:1;pointer-events:auto}
+.ending-brand span,.ending-close>span{display:none}
+.ending-close{width:44px;justify-content:center}
+.ending-header{border:0}
+.ending-header-actions{gap:17px}
+.ending-controls{justify-content:flex-end}
+.ending-controls button{width:44px;justify-content:center;font-size:16px}
+.ending-controls button span{display:none}
+.ending-timeline{opacity:.3;height:1px}
+.ending-finale .eyebrow{display:none}
+.finale-actions button,.finale-actions a{border:0;color:#acb6c4;font-size:11px;gap:12px}
+#page-curtain{position:fixed;inset:0;z-index:120;pointer-events:auto;background:var(--ui-bg);opacity:0}
+body.scene-changing{cursor:progress}
+/* A conventional focus outline remains available even when decoration is quiet. */
+@media(max-width:760px){
+.continuum{min-height:72svh;padding:48px 20px 105px}
+.continuum-trigger{gap:29px;min-height:220px}
+.continuum-line{font-size:24px}
+#contents-dialog{width:calc(100% - 28px);padding:18px 23px 24px}
+#contents-dialog .dialog-heading{padding-top:24px}
+#contents-dialog .dialog-heading h2{font-size:25px}
+#dialog-chapters .chapter-row{min-height:65px}
+#dialog-chapters .chapter-row[aria-current="page"]:before{left:-11px}
+.ending-header-actions{gap:10px}
+.ending-controls>div{gap:12px}
+}
+@media(prefers-reduced-motion:reduce){
+#reader-article,#home-view{transform:none!important;filter:none!important}
+.continuum-star:before,.continuum-star:after,.seed-core{transition:none}
+.ending-header,.ending-controls,.ending-timeline{transition:none}
+}
+@media print{.continuum,#page-curtain{display:none!important}}
+
+/* Override the inherited v2 selected-state ink as well as the surface. */
+#contents-dialog #dialog-chapters .chapter-row .row-title,
+#contents-dialog #dialog-chapters .chapter-row:hover .row-title,
+#contents-dialog #dialog-chapters .chapter-row.is-selected .row-title{color:var(--ui-fg)}
+#contents-dialog #dialog-chapters .row-number,#contents-dialog #dialog-chapters .row-arrow,#contents-dialog #dialog-chapters .row-en{color:var(--ui-muted)}
+#contents-dialog #dialog-chapters .chapter-row[aria-current="page"] .row-number{color:var(--ui-fg)}
+
+#ending-view.is-entering .ending-header *,#ending-view.is-entering .ending-controls *,#ending-view.is-entering .ending-finale *,
+#ending-view.is-returning .ending-header *,#ending-view.is-returning .ending-controls *,#ending-view.is-returning .ending-finale *{pointer-events:none!important}
+
+#ending-view.is-returning .ending-finale{animation:none!important;opacity:0;transition:opacity .5s ease}
+.swatch-dark{background:#0b0b0b}

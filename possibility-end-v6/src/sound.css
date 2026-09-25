@@ -1,0 +1,45 @@
+/* v5: retain the approved v4 art; add only sound controls and an in-page finale. */
+html.ending-open,body.ending-open{overflow:hidden;overscroll-behavior:none}
+.ending-view{position:fixed;inset:0;margin:0;padding:0;border:0;border-radius:0;width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;min-height:0;color:#eff4f7;overscroll-behavior:contain}
+.ending-view::backdrop{background:#020309;backdrop-filter:none}
+.ending-view #bigbang-canvas{touch-action:none}
+.ending-view.is-loading .ending-intro{visibility:hidden}
+.ending-view.is-loading .ending-mode-label:after{content:" · 사운드 준비 중"}
+.ending-header-actions{display:flex;align-items:center;gap:30px;pointer-events:auto}
+.ending-header button{pointer-events:auto}
+.ending-view .ending-close{padding:0}
+.sound-control{position:relative;flex:none;--sound-text:#b3bbc5;--sound-border:rgba(160,181,207,.22);--sound-bg:#0d121b;color:var(--sound-text)}
+.sound-toggle{display:flex;align-items:center;gap:8px;padding:0;min-height:44px;font-size:11px;white-space:nowrap;color:inherit}
+.sound-toggle svg{flex:none}.sound-toggle:hover{color:#f0f2f6}.sound-toggle .sound-waves{display:none}.sound-toggle.is-on .sound-waves{display:block}.sound-toggle.is-on .sound-slash{display:none}.sound-toggle.is-on{color:#e1e6ed}.sound-toggle.is-loading{opacity:.6}
+.sound-panel{position:absolute;top:calc(100% + 7px);right:0;width:224px;padding:19px 19px 16px;background:var(--sound-bg);border:1px solid var(--sound-border);box-shadow:0 12px 38px rgba(0,0,0,.24);color:var(--sound-text);z-index:90;pointer-events:auto;text-align:left}
+.sound-panel label,.reader-volume-label{display:flex;justify-content:space-between;gap:15px;font-size:11px;font-family:var(--sans);line-height:1.5}
+.sound-panel output,.reader-volume-label output{font-family:var(--mono);font-size:10px}
+input[data-audio-volume]{display:block;appearance:none;width:100%;margin:11px 0 0;height:32px;background:transparent;cursor:pointer;accent-color:#dce3ed}
+input[data-audio-volume]::-webkit-slider-runnable-track{height:2px;background:#5a697e}
+input[data-audio-volume]::-moz-range-track{height:2px;background:#5a697e}
+input[data-audio-volume]::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;background:#d9e3f0;margin-top:-5.5px;border:0}
+input[data-audio-volume]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#d9e3f0;border:0}
+input[data-audio-volume]:focus-visible{outline:1px solid currentColor;outline-offset:5px}
+.sound-panel p{font-size:10px;line-height:1.85;margin-top:8px;color:#8d9bad;letter-spacing:-.02em}
+body[data-view="reader"] .site-header .sound-control{--sound-text:var(--reader-muted);--sound-bg:var(--reader-bg);--sound-border:var(--reader-line)}
+body[data-view="reader"] .site-header .sound-toggle.is-on,body[data-view="reader"] .site-header .sound-toggle:hover{color:var(--reader-ink)}
+body:not([data-reader-theme="dark"]) .site-header .sound-panel p{color:var(--reader-muted)}
+.reader-volume-label{margin-top:2px}.reader-audio-note{font-size:10px;line-height:1.7;color:#77826f;margin-top:7px}
+.settings-dialog{overflow-y:auto}.ending-view .sound-toggle{font-size:10px}
+@media(max-width:1100px){.header-actions{gap:22px}.header-edition{margin-left:0}.header-edition:not(:empty){font-size:8px}}
+@media(max-width:760px){
+  .site-header .about-link{display:none}
+  .site-header .header-actions,body[data-view="reader"] .header-actions{gap:13px}
+  .site-header .sound-toggle{width:40px;justify-content:center}
+  .site-header .sound-toggle>span{display:none}
+  .sound-panel{width:214px;right:-24px}
+  .ending-header-actions{gap:20px}
+  .ending-view .sound-toggle{width:40px;justify-content:center}
+  .ending-view .sound-toggle>span{display:none}
+  .ending-view .sound-panel{right:-38px}
+  .ending-header{padding-top:max(16px,env(safe-area-inset-top));padding-left:max(23px,env(safe-area-inset-left));padding-right:max(23px,env(safe-area-inset-right))}
+  .ending-controls{bottom:max(15px,env(safe-area-inset-bottom))}
+  .ending-view .ending-intro{bottom:95px}
+}
+@media(max-width:370px){.site-header .header-actions,body[data-view="reader"] .header-actions{gap:8px}.ending-header-actions{gap:12px}.sound-panel{right:-43px}}
+@media print{.sound-control,#ending-view{display:none!important}}

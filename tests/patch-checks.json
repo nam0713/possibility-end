@@ -1,0 +1,177 @@
+{
+  "checks": [
+    {
+      "name": "320x568 ring: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568 ring: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568 ring: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568 galaxy: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568 galaxy: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568 galaxy: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "320x568: exploration framing unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 ring: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 ring: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 ring: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 galaxy: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 galaxy: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844 galaxy: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "390x844: exploration framing unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 ring: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 ring: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 ring: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 galaxy: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 galaxy: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390 galaxy: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "844x390: exploration framing unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 ring: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 ring: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 ring: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 galaxy: original title and full cover layout restored",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 galaxy: original scale and x position, only +24px vertical gap",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900 galaxy: no added scroll length",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900: exploration framing unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "V8 scrolling retained: vertical swipe scrolls, does not rotate/move stars",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "V8 scrolling retained: rendering stays quiet through swipe",
+      "pass": true,
+      "detail": {
+        "a": 4,
+        "b": 4
+      }
+    },
+    {
+      "name": "V8 scrolling retained: visible animation resumes after settling",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "Reader and ending opener still work",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "No JavaScript errors",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "passed": 33,
+  "total": 33,
+  "errors": [],
+  "html_sha256": "8bfcb74a938776603afbdc38d5058c7bc55d7f5d076c61388d1b477aa719e7c3",
+  "environment": "Chromium / Xvfb / SwiftShader; exact self-contained HTML via set_content; mobile emulation, not physical phones; system font fallback"
+}

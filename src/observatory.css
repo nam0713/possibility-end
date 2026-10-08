@@ -1,0 +1,267 @@
+/* A spatial chapter index: cold light, engineered type, and one working orbit.
+   The guide follows the actual projected chapter nodes in cosmos.js. */
+:root{--dark:#05080c;--cream:#eaf2f8;--accent:#a9e7f2;--line:#25313c;--ui-bg:#0a1017;--ui-fg:#eaf2f8;--ui-muted:#9caeba;--ui-line:#263643;--ui-hover:#ffffff05;--reading-font:var(--sans);--gutter:clamp(28px,5vw,88px)}
+body[data-view="home"]{background:#05080c;color:#eaf2f8}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:5px}
+.site-header{height:82px;border-bottom:1px solid #748ca527;gap:24px}
+.site-header .wordmark,.ending-brand{font-family:var(--sans);font-size:15px;font-weight:500;letter-spacing:-.045em}
+.site-header .brand-symbol{display:inline-block;width:20px;height:20px;color:#c8e3ef}
+.site-header .header-actions{gap:26px}
+.site-header .about-link,.site-header .menu-button,.site-header .sound-toggle{font-size:12px;color:#b4c6d2}
+.site-header .menu-button{gap:12px}
+.menu-icon{display:flex;width:15px;gap:5px}
+.header-edition{display:none}
+
+/* Cover: title at the left, the spatial index at the right. */
+.hero,.hero.is-exploring{height:100svh;min-height:660px;max-height:none;padding:0;background:#05080c}
+.hero .cosmos-stage{inset:0;z-index:0}
+.hero-shade{background:linear-gradient(90deg,#05080cee,transparent 52%),linear-gradient(0deg,#05080c 0%,#05080ccc 16%,transparent 35%);z-index:1;pointer-events:none}
+.hero-content{position:absolute;inset:0;padding:0;max-width:none;z-index:3;pointer-events:none}
+.cover-meta{position:absolute;top:22%;left:var(--gutter);display:flex;align-items:center;gap:24px;color:#afc6d4;font-size:11px;letter-spacing:.035em}
+.cover-meta .mono{font-size:10px;color:#6e8698;letter-spacing:.08em}
+.hero h1{position:absolute;top:calc(22% + 36px);left:calc(var(--gutter) - 5px);right:auto;width:48%;padding:0;text-align:left;font-family:var(--sans);font-weight:500;font-size:clamp(78px,7.9vw,144px);line-height:1.06;letter-spacing:-.08em;color:#edf4fa;pointer-events:none}
+.hero .title-last{display:block;margin:8px 0 0;line-height:1.04}
+.hero-english{display:block;position:absolute;left:var(--gutter);top:calc(22% + 62px + 16.2vw);margin:0;font-family:var(--mono);font-size:10px;line-height:1.7;letter-spacing:.14em;font-style:normal;text-transform:uppercase;color:#7993a6}
+.cover-actions{position:absolute;left:var(--gutter);right:auto;bottom:210px;transform:none;width:auto;max-width:none;display:flex;align-items:center;gap:28px}
+.cover-actions .cover-read{position:relative;display:inline-flex;align-items:center;justify-content:space-between;gap:36px;min-width:160px;min-height:48px;padding:12px 20px;background:#d9f0f7;color:#081018;font-family:var(--sans);font-size:13px;line-height:1.5;font-weight:600;transition:background .2s,color .2s;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%)}
+.cover-actions .cover-read::after{display:none}
+.cover-actions .cover-read:hover{background:#fff;color:#081018}
+.cover-actions .cover-read:focus-visible{clip-path:none;outline-offset:5px}
+.cover-actions .universe-button{font-size:12px;min-height:48px;min-width:72px;padding:0;border:0;background:none;color:#a3bacb;position:relative}
+.cover-actions .universe-button::after{content:"";position:absolute;left:0;right:0;bottom:8px;height:1px;background:#607d9166;transition:background .2s}
+.cover-actions .universe-button:hover{color:#e7f7ff;background:none}
+.cover-actions .universe-button:hover::after{background:#a9e7f2}
+.resume-link{position:absolute;bottom:164px;left:var(--gutter);right:auto;transform:none;padding:0;min-height:36px;font-size:11px;color:#a5c3d5;gap:14px}
+.resume-link span{padding:0}
+.resume-link .resume-chapter{color:#7893a7;font-family:var(--mono);font-size:10px}
+
+/* The eight cells select the real stars; the numerical labels share that index. */
+.hero .constellation-nav,.hero.is-exploring .constellation-nav{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));position:absolute;left:var(--gutter);right:var(--gutter);bottom:90px;z-index:6;gap:0;padding:0;border:0;opacity:1;transform:none;pointer-events:auto}
+.constellation-nav button,.hero.is-exploring .constellation-nav button{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:65px;margin:0;padding:10px 14px 10px 0;gap:7px;border:0;border-top:1px solid #344857;font-family:var(--sans);font-size:12px;line-height:1.4;font-weight:500;color:#a3bac8;transition:background .18s,color .18s}
+.constellation-nav button .mono,.hero.is-exploring .constellation-nav button .mono{font-size:10px;letter-spacing:.12em;color:#638499}
+.constellation-nav button:last-child,.hero.is-exploring .constellation-nav button:last-child{font-size:12px}
+.constellation-nav button::before{content:"";position:absolute;top:-1px;left:0;width:5px;height:1px;background:#a7c4d7}
+.constellation-nav button:hover,.constellation-nav button[aria-pressed="true"]{color:#edfaff;background:linear-gradient(180deg,#a9e7f216,transparent)}
+.constellation-nav button:hover::before,.constellation-nav button[aria-pressed="true"]::before{width:100%;background:#a9e7f2}
+.constellation-nav button[aria-pressed="true"] .mono{color:#c4f4fb}
+.chapter-orbit{position:absolute;inset:0;z-index:1;width:100%;height:100%;overflow:hidden;pointer-events:none;fill:none}
+#chapter-orbit-line{stroke:#96c9dc;stroke-width:.65;opacity:.22}
+#chapter-orbit-focus{stroke:#c1f7ff;stroke-width:1;opacity:.9}
+.star-hotspot:before,.star-hotspot.is-central:before{width:28px;height:28px;border:1px solid transparent;border-radius:0;transition:border-color .15s;transform:translate(-50%,-50%) rotate(45deg)}
+.star-hotspot:hover:before,.star-hotspot:focus-visible:before,.star-hotspot[aria-pressed="true"]:before{border-color:#b9e9f3}
+.star-hotspot .star-label,.star-hotspot.is-central .star-label{top:14px;left:39px;font-family:var(--mono);font-size:10px;color:#aac8db;letter-spacing:.06em;text-shadow:0 1px 6px #05080c}
+.hero .star-hotspot .star-label b,.hero.is-exploring .star-hotspot .star-label b,.hero .star-hotspot[aria-pressed="true"] .star-label b,.hero.is-exploring .star-hotspot[aria-pressed="true"] .star-label b{display:none}
+.hero.is-exploring .star-hotspot:hover .star-label b,.hero.is-exploring .star-hotspot:focus-visible .star-label b{display:none}
+.hero .hero-dock,.hero.is-exploring .hero-dock{bottom:22px;left:var(--gutter);right:var(--gutter);padding:9px 0 0;border-top:1px solid #789ab32a;gap:20px}
+.hero-dock .scene-switcher{gap:18px;border:0;padding:0;background:none}
+.hero-dock .scene-switcher button{min-height:44px;min-width:44px;font-size:11px;color:#809aad}
+.hero-dock .scene-switcher button[aria-pressed="true"]{color:#d1e8f6}
+.hero-dock .scene-switcher button[aria-pressed="true"]::after{left:0;right:auto;width:12px;bottom:5px;background:#a9e7f2}
+.hero-dock .cosmos-tools{color:#a7bfce}
+.hero-dock .cosmos-tools button{font-size:21px;font-weight:300}
+.hero-dock .cosmos-tools button:hover{color:#e9fcff;background:#ffffff06}
+
+/* Selecting a chapter replaces the cover's entry actions with that chapter. */
+.hero.has-selection:not(.is-exploring) .cover-actions,.hero.has-selection:not(.is-exploring) .resume-link{visibility:hidden;pointer-events:none}
+.star-inspector,.hero.is-exploring .star-inspector{position:absolute;left:var(--gutter);right:auto;bottom:183px;width:320px;max-width:calc(100% - 2*var(--gutter));padding:0 52px 0 0;border:0;border-radius:0;background:none;box-shadow:none;z-index:7;display:grid;grid-template-columns:1fr auto;column-gap:18px;align-items:center}
+.star-inspector>.mono{grid-column:1/3;font-family:var(--mono);font-size:10px;color:#89bfd4;letter-spacing:.1em;line-height:1.5;margin-bottom:8px}
+.star-inspector h3{font-family:var(--sans);font-size:29px;font-weight:500;letter-spacing:-.05em;line-height:1.35;margin:0;color:#edf6fc;word-break:keep-all}
+.star-inspector a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:58px;margin:0;padding:0 12px;background:#d9f0f7;border:0;font-size:12px;font-weight:600;color:#081018;line-height:1.5}
+.star-inspector a:hover{background:white}
+.star-dismiss{position:absolute;right:0;top:-3px;width:44px;min-height:44px;font-size:24px;font-weight:300;color:#95afc1}
+.hero.is-exploring .universe-heading{left:var(--gutter);top:126px}
+.universe-heading h2{font-family:var(--sans);font-size:24px!important;font-weight:500;color:#dae9f2;letter-spacing:-.05em}
+.exit-universe,.hero.is-exploring .exit-universe{top:116px;right:var(--gutter);width:auto;gap:18px;font-size:12px;color:#b6ccda;border:0;border-radius:0;background:none}
+
+/* Chapters: one large model and a precise, compact sequence. */
+.contents-section{background:#080e15;color:#e8f3fa;padding:94px max(var(--gutter),calc((100vw - 1320px)/2)) 110px;border-top:1px solid #2f424f66}
+.contents-intro{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 48px;padding:0 0 22px;border-bottom:1px solid #3d556454}
+.contents-intro h2{font-family:var(--sans);font-weight:500;font-size:26px;line-height:1.4;letter-spacing:-.055em}
+.contents-intro>.mono{font-size:10px;color:#849eb0;letter-spacing:.12em}
+.contents-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10%;align-items:start}
+.chapter-preview{position:sticky;top:80px;display:block;padding:0;margin:0}
+.chapter-preview .preview-figure{width:100%;height:auto;aspect-ratio:1.3;max-width:none;margin:0;border:0;background:radial-gradient(ellipse at 50% 60%,#19304537,transparent 65%)}
+.preview-figure:before,.preview-figure:after{display:none}
+.preview-figure .mini-reset{top:0;right:0;color:#8bb1c9;background:none}
+.preview-caption{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0 0;border-top:1px solid #3d556454;font-size:11px;color:#b0c7d6}
+.preview-caption .mono{font-size:10px;color:#83bacf;letter-spacing:.12em}
+.preview-title{font-family:var(--sans);font-size:clamp(30px,3.1vw,48px);font-weight:500;letter-spacing:-.055em;line-height:1.4;margin-top:16px;color:#e2eff7;word-break:keep-all}
+.chapter-list{border:0;padding:0}
+.chapter-row{display:grid;grid-template-columns:40px minmax(0,1fr) 20px;min-height:74px;gap:20px;align-items:center;padding:13px 0 13px 18px;border:0;border-bottom:1px solid #263744;color:#a5bac8;background:none;transition:color .18s,background .18s}
+.chapter-row:last-child{border-bottom:1px solid #263744}
+.row-number{align-self:center;padding:0;font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:#567f98}
+.row-title,.chapter-row[data-chapter="8"] .row-title{font-family:var(--sans);font-size:26px;font-weight:500;line-height:1.5;letter-spacing:-.04em;color:inherit}
+.chapter-row::before{content:"";position:absolute;left:0;top:28%;bottom:28%;width:2px;background:#a9e7f2;opacity:0}
+.chapter-row::after{content:"↗";font-family:var(--sans);font-size:18px;font-weight:300;color:#7495aa;opacity:0}
+.chapter-row:hover,.chapter-row.is-selected{padding-left:18px;color:#eafaff;background:linear-gradient(90deg,#a9e7f20b,transparent)}
+.chapter-row:hover::before,.chapter-row.is-selected::before,.chapter-row:hover::after,.chapter-row.is-selected::after{opacity:1}
+.chapter-row:hover .row-number,.chapter-row.is-selected .row-number{color:#b7edfa}
+.chapter-row:focus-visible{outline-offset:2px}
+.interlude{padding:116px max(var(--gutter),calc((100vw - 1320px)/2));display:block;background:#05080c;border-bottom:1px solid #21303b}
+.interlude blockquote{font-family:var(--sans);font-size:clamp(26px,3.4vw,50px);font-weight:500;line-height:1.65;letter-spacing:-.055em;color:#d3e2ed;max-width:100%;margin:0}
+.interlude blockquote span{color:#64849c}
+.interlude .text-link{display:inline-flex;margin:32px 0 0;min-height:44px;font-family:var(--mono);font-size:11px;letter-spacing:.045em;color:#a7d3e5}
+.site-footer{background:#05080c;border-top:0;padding:32px var(--gutter) 36px}
+.footer-work{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px 24px;line-height:1.7}
+.footer-title{font-size:14px;font-weight:500;letter-spacing:-.04em;color:#d3e2ed}
+.footer-meta{font-size:12px;color:#91a7b8}
+.back-top{font-size:12px;color:#adc4d4}
+
+/* The chapter opening and utility sheets share the same typographic system. */
+body[data-reader-theme="paper"]{--reader-bg:var(--paper);--reader-ink:var(--ink);--reader-muted:#626960;--reader-line:#c6cbc1}
+body[data-reader-theme="dark"]{--reader-bg:#080d13;--reader-ink:#dce6ee;--reader-muted:#91a7b8;--reader-line:#273743}
+body[data-view="reader"] .site-header{border-bottom:1px solid var(--reader-line)}
+body[data-view="reader"] .site-header .wordmark,body[data-view="reader"] .site-header .menu-button,body[data-view="reader"] .site-header .sound-toggle{color:var(--reader-ink)}
+body[data-view="reader"] .site-header .about-link{color:var(--reader-muted)}
+body[data-view="reader"] button:focus-visible,body[data-view="reader"] a:focus-visible{outline-color:var(--reader-ink)}
+.reader-toolbar .mono{font-size:10px;letter-spacing:.14em}
+body[data-reader-theme] .chapter-cover .eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.035em;color:var(--reader-muted)}
+.prose p.quoted{color:var(--reader-ink);font-size:1em;font-weight:500;line-height:inherit;letter-spacing:inherit;border:0;padding:0;margin:2em 0}
+.chapter-cover h1{font-family:var(--sans);font-weight:500;letter-spacing:-.075em;line-height:1.18}
+.chapter-cover h1.long-title{font-size:clamp(47px,5.1vw,82px);line-height:1.3}
+.chapter-cover-meta,.chapter-cover-meta .mono{font-size:10px;letter-spacing:.09em}
+.chapter-space-controls button{font-size:20px}
+.next-chapter-link{font-family:var(--sans);font-weight:500;letter-spacing:-.055em;font-size:35px;line-height:1.5}
+.reader-bottom-bar{border-top:1px solid var(--reader-line)}
+#contents-dialog,#settings-dialog{border:0;border-radius:0;background:var(--ui-bg);color:var(--ui-fg);box-shadow:0 20px 90px #0009}
+#contents-dialog{width:min(620px,calc(100% - 48px));padding:26px 40px 32px}
+#contents-dialog .dialog-top{padding:0;border:0}
+#contents-dialog .dialog-top .wordmark{font-family:var(--sans);font-size:12px;color:var(--ui-muted)}
+#contents-dialog .dialog-heading{padding:27px 0 25px;border-bottom:1px solid var(--ui-line);margin-bottom:12px}
+#contents-dialog .dialog-heading h2,#settings-dialog .settings-header h2{font-family:var(--sans);font-size:25px;font-weight:500;letter-spacing:-.045em}
+#contents-dialog .dialog-heading>.mono{font-size:10px;letter-spacing:.12em}
+#contents-dialog #dialog-chapters .chapter-row{grid-template-columns:35px minmax(0,1fr) 20px;min-height:61px;gap:18px;padding:10px 0 10px 14px;border:0;border-bottom:1px solid var(--ui-line);background:none;color:var(--ui-muted)}
+#contents-dialog #dialog-chapters .row-title{font-family:var(--sans);font-size:21px;font-weight:500;line-height:1.5;letter-spacing:-.03em}
+#contents-dialog #dialog-chapters .row-number{font-size:11px;color:var(--ui-muted)}
+#contents-dialog #dialog-chapters .chapter-row:hover,#contents-dialog #dialog-chapters .chapter-row[aria-current="page"]{color:var(--ui-fg);background:var(--ui-hover)}
+#contents-dialog #dialog-chapters .chapter-row[aria-current="page"]::before{display:block;opacity:1;background:var(--ui-fg)}
+#contents-dialog #dialog-chapters .chapter-row::after{color:var(--ui-muted)}
+#settings-dialog{padding:26px 32px 30px}
+#settings-dialog legend{font-size:12px}
+#settings-dialog .settings-preview{font-family:var(--reading-font);font-size:21px}
+.sound-panel{border:0;border-radius:0;background:var(--ui-bg);padding:22px}
+.ending-brand{letter-spacing:-.04em}
+
+@media(min-width:1800px){.hero-english{top:calc(22% + 378px)}}
+@media(min-width:761px) and (max-height:760px){
+ .cover-meta{top:19%}.hero h1{top:calc(19% + 30px);font-size:clamp(70px,7.3vw,100px)}
+ .hero-english{top:calc(19% + 52px + 15vw);font-size:9px}
+ .cover-actions{bottom:210px}.resume-link{bottom:165px}
+ .star-inspector,.hero.is-exploring .star-inspector{bottom:181px}
+}
+@media(min-width:761px) and (max-width:1100px){
+ .hero h1{font-size:80px}.hero-english{top:calc(22% + 242px)}
+ .hero.has-selection:not(.is-exploring) .hero-english{visibility:hidden}
+ .constellation-nav button,.hero.is-exploring .constellation-nav button{font-size:11px;padding-right:4px}
+ .contents-layout{gap:6%;grid-template-columns:1fr 1fr}
+ .row-title,.chapter-row[data-chapter="8"] .row-title{font-size:23px}
+ .chapter-row{gap:12px;padding-left:12px}
+ .chapter-row:hover,.chapter-row.is-selected{padding-left:12px}
+}
+@media(max-width:760px){
+ :root{--gutter:24px}
+ .site-header,body[data-view="reader"] .site-header{height:var(--mobile-header);gap:10px}
+ .site-header .wordmark{font-size:13px;gap:10px}
+ .site-header .brand-symbol{width:17px;height:17px}
+ .site-header .header-actions,body[data-view="reader"] .site-header .header-actions{gap:12px}
+ .site-header .menu-button{font-size:12px;gap:9px}
+ .menu-icon{width:14px}
+ .hero,.hero.is-exploring{height:100svh;min-height:calc(568px + env(safe-area-inset-top,0px) + env(safe-area-inset-bottom,0px));max-height:none}
+ .hero-shade{background:linear-gradient(180deg,#05080caa,transparent 28%,transparent 55%,#05080ccf 77%,#05080c)}
+ .cover-meta{top:calc(93px + env(safe-area-inset-top,0px));left:var(--gutter);font-size:10px;gap:17px}
+ .cover-meta .mono{font-size:9px}
+ .hero h1{top:calc(126px + env(safe-area-inset-top,0px));left:calc(var(--gutter) - 2px);right:var(--gutter);width:auto;font-size:clamp(39px,11.2vw,78px);line-height:1.15;padding:0;letter-spacing:-.075em}
+ .hero .title-last{display:inline;margin:0;line-height:inherit}
+ .hero-english{left:var(--gutter);top:calc(138px + 12vw + env(safe-area-inset-top,0px));font-size:8px;letter-spacing:.12em;line-height:1.5}
+ .cover-actions{left:var(--gutter);right:auto;bottom:calc(214px + env(safe-area-inset-bottom,0px));gap:26px;transform:none;max-width:calc(100% - 48px)}
+ .cover-actions .cover-read{min-width:145px;min-height:46px;font-size:12px;padding:12px 18px;gap:30px}
+ .cover-actions .universe-button{min-width:72px;min-height:46px;font-size:12px}
+ .resume-link{left:var(--gutter);bottom:calc(171px + env(safe-area-inset-bottom,0px));right:auto;max-width:calc(100% - 48px);font-size:10px;gap:12px;min-height:32px}
+ .resume-link .resume-chapter{font-size:9px}
+ .hero .constellation-nav,.hero.is-exploring .constellation-nav{left:var(--gutter);right:var(--gutter);bottom:calc(72px + env(safe-area-inset-bottom,0px));grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+ .constellation-nav button,.hero.is-exploring .constellation-nav button{min-height:44px;flex-direction:row;align-items:center;justify-content:flex-start;gap:8px;padding:8px 4px 8px 0;font-size:11px;line-height:1.3}
+ .constellation-nav button .mono,.hero.is-exploring .constellation-nav button .mono{font-size:9px;letter-spacing:.03em}
+ .constellation-nav button:last-child,.hero.is-exploring .constellation-nav button:last-child{font-size:11px}
+ .hero .hero-dock,.hero.is-exploring .hero-dock{bottom:calc(12px + env(safe-area-inset-bottom,0px));padding-top:5px;gap:8px}
+ .hero-dock .scene-switcher{gap:4px}
+ .hero-dock .scene-switcher button{font-size:10px}
+ .hero-dock .cosmos-tools button{font-size:20px;width:44px;min-width:44px}
+ .star-hotspot .star-label,.star-hotspot.is-central .star-label{font-size:9px;left:35px;top:15px}
+ .hero.is-exploring .star-hotspot:hover .star-label b,.hero.is-exploring .star-hotspot:focus-visible .star-label b{display:none}
+ .star-inspector,.hero.is-exploring .star-inspector{left:var(--gutter);bottom:calc(184px + env(safe-area-inset-bottom,0px));width:310px;max-width:calc(100% - 48px);padding:0 44px 0 0;gap:5px 12px}
+ .star-inspector>.mono{font-size:9px;margin:0 0 3px}
+ .star-inspector h3{font-size:25px;line-height:1.3}
+ .star-inspector a{font-size:11px;min-width:53px;padding:0 10px}
+ .star-dismiss{top:0;font-size:23px}
+ .hero.is-exploring .universe-heading{top:calc(102px + env(safe-area-inset-top,0px));left:var(--gutter)}
+ .universe-heading h2{font-size:22px!important}
+ .exit-universe,.hero.is-exploring .exit-universe{top:calc(91px + env(safe-area-inset-top,0px));right:var(--gutter);gap:12px;font-size:11px}
+ .contents-section{padding:54px var(--gutter) 66px}
+ .contents-intro{margin:0 0 30px;padding-bottom:18px}
+ .contents-intro h2{font-size:23px}
+ .contents-layout{display:flex;flex-direction:column;gap:30px}
+ .chapter-preview{position:relative;top:auto;width:100%;margin:0;padding:0}
+ .chapter-preview .preview-figure{height:clamp(220px,68vw,380px);aspect-ratio:auto;width:100%;margin:0}
+ .preview-caption{padding-top:17px;font-size:10px}
+ .preview-caption .mono{font-size:9px}
+ .preview-title{font-size:29px;margin-top:12px}
+ .chapter-row{min-height:63px;padding:10px 0 10px 12px;grid-template-columns:28px minmax(0,1fr) 18px;gap:14px}
+ .row-number{font-size:11px}
+ .row-title,.chapter-row[data-chapter="8"] .row-title{font-size:22px;line-height:1.5}
+ .chapter-row:hover,.chapter-row.is-selected{padding-left:12px}
+ .interlude{padding:63px var(--gutter) 60px}
+ .interlude blockquote{font-size:26px;line-height:1.7;letter-spacing:-.06em}
+ .interlude blockquote br{display:none}
+ .interlude blockquote span{display:block}
+ .interlude .text-link{font-size:10px;margin-top:22px}
+ .site-footer{padding:24px var(--gutter) calc(24px + env(safe-area-inset-bottom,0px))}
+ .footer-work{display:flex;flex-direction:column;gap:3px}
+ .footer-title{font-size:13px}
+ .footer-meta{font-size:11px}
+ .back-top{font-size:11px}
+ .chapter-cover h1{font-family:var(--sans);font-weight:500;line-height:1.2;font-size:clamp(54px,16vw,82px)}
+ .chapter-cover h1.long-title{font-size:clamp(34px,10.1vw,46px);line-height:1.3}
+ body[data-reader-theme] .chapter-cover .eyebrow{font-size:11px;letter-spacing:0}
+ .chapter-cover-meta,.chapter-cover-meta .mono{font-size:9px;letter-spacing:.05em}
+ .reader-toolbar .mono{font-size:9px}
+ .next-chapter-link{font-size:29px}
+ #contents-dialog{width:calc(100% - 24px);padding:18px 25px 24px;max-height:calc(100dvh - 24px)}
+ #contents-dialog .dialog-heading{padding:20px 0 18px}
+ #contents-dialog .dialog-heading h2,#settings-dialog .settings-header h2{font-size:23px}
+ #contents-dialog #dialog-chapters .chapter-row{min-height:53px;grid-template-columns:27px minmax(0,1fr) 18px;gap:11px;padding:9px 0 9px 11px}
+ #contents-dialog #dialog-chapters .row-title{font-size:19px}
+ #contents-dialog #dialog-chapters .row-number{font-size:10px}
+ #settings-dialog{padding:23px 27px 28px}
+}
+@media(max-width:359px){
+ :root{--gutter:20px}
+ .site-header .wordmark{font-size:12px;gap:7px}
+ .site-header .header-actions,body[data-view="reader"] .site-header .header-actions{gap:4px}
+ .site-header .brand-symbol{width:15px;height:15px}
+ .hero h1{font-size:36px;top:calc(121px + env(safe-area-inset-top,0px))}
+ .hero-english{top:calc(174px + env(safe-area-inset-top,0px));font-size:7px}
+ .hero-dock .scene-switcher{gap:0}
+ .hero .constellation-nav,.hero.is-exploring .constellation-nav{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+ .constellation-nav button,.hero.is-exploring .constellation-nav button{gap:5px;font-size:10px;min-height:44px}
+ .constellation-nav button:last-child,.hero.is-exploring .constellation-nav button:last-child{font-size:10px}
+ .cover-actions{gap:22px}
+ .cover-actions .cover-read{min-width:135px;gap:25px}
+ .star-inspector,.hero.is-exploring .star-inspector{max-width:calc(100% - 40px);width:280px}
+ .star-inspector h3{font-size:22px}
+ .row-title,.chapter-row[data-chapter="8"] .row-title{font-size:20px}
+ .interlude blockquote{font-size:24px}
+}
+@media(max-height:520px) and (orientation:landscape){
+ .hero,.hero.is-exploring{min-height:calc(480px + env(safe-area-inset-top,0px) + env(safe-area-inset-bottom,0px))}
+ .cover-meta{top:calc(82px + env(safe-area-inset-top,0px))}.hero h1{top:calc(109px + env(safe-area-inset-top,0px));font-size:clamp(45px,6.4vw,70px);width:46%;right:auto}
+ .hero .title-last{display:block;margin-top:4px}
+ .hero-english{top:calc(123px + 13.5vw + env(safe-area-inset-top,0px))}
+ .cover-actions{bottom:calc(159px + env(safe-area-inset-bottom,0px));gap:20px}.resume-link{bottom:calc(121px + env(safe-area-inset-bottom,0px))}
+ .hero .constellation-nav,.hero.is-exploring .constellation-nav{bottom:calc(69px + env(safe-area-inset-bottom,0px));grid-template-columns:repeat(8,minmax(0,1fr))}
+ .constellation-nav button,.hero.is-exploring .constellation-nav button{flex-direction:column;align-items:flex-start;gap:4px;min-height:48px;font-size:10px}
+ .hero .hero-dock,.hero.is-exploring .hero-dock{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+ .star-inspector,.hero.is-exploring .star-inspector{bottom:calc(135px + env(safe-area-inset-bottom,0px));max-width:280px}
+ .hero.is-exploring .universe-heading{top:calc(81px + env(safe-area-inset-top,0px))}.hero.is-exploring .exit-universe{top:calc(70px + env(safe-area-inset-top,0px))}
+}
+@media(prefers-reduced-motion:reduce){.constellation-nav button,.cover-actions a,.chapter-row,.star-hotspot:before{transition:none}}
+@media print{.cover-meta,.hero-english,.chapter-orbit,.preview-title{display:none!important}.chapter-cover h1{font-family:var(--sans)!important}}

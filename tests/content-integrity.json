@@ -1,0 +1,14 @@
+{
+  "edited_manuscript_sha256": "9db95b7b7096ae063097b4e237cc91a3ed99bfdd7c611e5d7b8de39c048e04e5",
+  "original_manuscript_sha256": "129dc237240ce3bd90c9dd4d408957031c9a7e39104542110404e27cf9e13ba5",
+  "corrections": 18,
+  "chapters": 8,
+  "blocks": 215,
+  "chapter_data_matches_edited_manuscript": true,
+  "no_js_fallback_matches_edited_manuscript": true,
+  "html_sha256": "7bb1ce8f88c321f91fa298cb97ae012b1af235e4abb4a191b49a05c33b8cc23d",
+  "audio_sha256": {
+    "first-light.mp3": "4555ffe7fe255a53167a8a2e2cfbca7688c4873e321073659debb6cf89532e7b",
+    "horizon.mp3": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e"
+  }
+}

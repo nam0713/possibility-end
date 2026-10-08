@@ -1,0 +1,67 @@
+{
+  "base": "v8",
+  "restored_layout": "v7",
+  "cover_offset_css_px": 24,
+  "changed_runtime_files": [
+    "src/cosmos.js",
+    "src/mobile.css"
+  ],
+  "unchanged_runtime_files": [
+    {
+      "file": "src/app.js",
+      "sha256": "6c497154c9b98f2a40eb9021b2f27d6f20019668afc07615026b860b4e8bb044"
+    },
+    {
+      "file": "src/audio.js",
+      "sha256": "0dd3b95dcc422ff44a73f0ddb574c77e9c7935d5702f388ce06def6f4d6bb625"
+    },
+    {
+      "file": "src/chapters.json",
+      "sha256": "3d869347b102576ca6f49541010835012f1344eed8d2b5f528a453382dc3aa4d"
+    },
+    {
+      "file": "src/cinematic.css",
+      "sha256": "7cc5d0fa0260353f8ee51556fc87a8e63527e22a42ac5aad67a166c1d64304ec"
+    },
+    {
+      "file": "src/cinematic.js",
+      "sha256": "82a72e2e82059fa5b8522b7d79ecb7d23d68d28e48815854f5b5d588c864d40a"
+    },
+    {
+      "file": "src/ending.js",
+      "sha256": "f72c3e254f8e5e979171e400b724a5b1797f0f5e606d48a9e33b75995c33dc45"
+    },
+    {
+      "file": "src/immersive.css",
+      "sha256": "10dff242f8e0aa17abb3b78653206a52a7a28300b6743e4117ced7a07e77d9ed"
+    },
+    {
+      "file": "src/manuscript.txt",
+      "sha256": "9db95b7b7096ae063097b4e237cc91a3ed99bfdd7c611e5d7b8de39c048e04e5"
+    },
+    {
+      "file": "src/shell.html",
+      "sha256": "79651b0132c478b81f3aef649726effbf380fac0df2eec1e5c24508c22a52e14"
+    },
+    {
+      "file": "src/sound.css",
+      "sha256": "d31d49155bed2226ae59846eb8454ffccf52b8a8539f16d03368eae5171e63f1"
+    },
+    {
+      "file": "src/styles.css",
+      "sha256": "4cb9eecd64959a4bb2b4b4f6b8487789f15ee959179cf77b02808c3b2f5d3d46"
+    },
+    {
+      "file": "assets/audio/audio-metrics.json",
+      "sha256": "84a104825fc0ef33139f05d4ccc2667826b73fda08dc2f6c1a1a7a7d55f231f7"
+    },
+    {
+      "file": "assets/audio/first-light.mp3",
+      "sha256": "4555ffe7fe255a53167a8a2e2cfbca7688c4873e321073659debb6cf89532e7b"
+    },
+    {
+      "file": "assets/audio/horizon.mp3",
+      "sha256": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e"
+    }
+  ]
+}

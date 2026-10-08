@@ -1,0 +1,164 @@
+/* V7 — bounded reading surfaces and one camera dock.
+ * Canvas pixels do not size the page. No absolute element is allowed to extend the book.
+ * The manuscript remains naturally scrollable; only the fullscreen presentation locks it.
+ */
+html{overscroll-behavior-y:none;overflow-x:clip;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{overscroll-behavior-y:none;min-width:0;overflow-x:clip}
+#home-view,#reader-view{max-width:100%;overflow:clip}
+#reader-article{contain:paint;overflow:clip}
+#home-view{contain:paint}
+.sr-only{top:0;left:0;max-width:1px;max-height:1px}
+.hero,.hero.is-exploring{height:100svh;min-height:600px;max-height:none}
+.hero h1{top:clamp(130px,18svh,210px)}
+.hero-dock{position:absolute;z-index:5;bottom:24px;left:var(--gutter);right:var(--gutter);display:flex;align-items:center;justify-content:space-between;gap:16px;pointer-events:none}
+.hero-dock>*{pointer-events:auto}
+.hero .hero-dock .scene-switcher,.hero.is-exploring .hero-dock .scene-switcher{position:static;inset:auto;transform:none;flex-shrink:0}
+.hero .hero-dock .cosmos-tools,.hero.is-exploring .hero-dock .cosmos-tools{position:static;inset:auto;display:flex;align-items:center;transform:none;gap:2px}
+.hero-dock .cosmos-tools button,.hero-dock .motion-button{width:44px;height:44px;min-height:44px;min-width:44px;display:grid;place-items:center;font-size:20px;padding:0}
+.hero-dock .cosmos-tools>span{display:none}
+.hero-dock .scene-switcher button{min-height:38px}
+.cover-actions{bottom:26px;left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 36px)}
+.cover-actions .universe-button{margin:0;min-height:44px}
+.resume-link{bottom:82px}
+.hero.is-exploring .hero-dock{bottom:24px}
+.hero.is-exploring .constellation-nav{bottom:91px}
+.hero.is-exploring .star-inspector{bottom:169px}
+.star-inspector{bottom:91px}
+.chapter-space-controls{bottom:28px;right:var(--gutter);left:auto;opacity:.8}
+.chapter-space-controls>div{gap:2px;display:flex;flex-wrap:nowrap}
+.chapter-space-controls button{width:44px;min-width:44px;height:44px;min-height:44px}
+.continuum{min-height:clamp(280px,54svh,520px);padding:42px 24px 44px;overflow:clip}
+.continuum-trigger{gap:28px;min-height:215px;max-width:100%}
+#reader-view{padding-bottom:calc(61px + env(safe-area-inset-bottom,0px))}
+.reader-bottom-bar{padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));min-height:60px}
+#chapter-end:not([data-last="true"]){margin-bottom:32px}
+#chapter-end[data-last="true"]{margin:0;padding:0}
+#ending-view{position:fixed;inset:0;width:100%;max-width:100%;height:100vh;height:100dvh;min-height:0;max-height:100dvh;overflow:hidden;overscroll-behavior:none;touch-action:none}
+#ending-view #bigbang-canvas{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:0;min-height:0;outline:0}
+#ending-view .ending-header{padding-top:max(16px,env(safe-area-inset-top,0px))}
+#ending-view .ending-controls{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+#ending-view .sound-panel{touch-action:pan-y}
+#page-curtain{contain:strict}
+/* Fallback clipping for older mobile implementations without overflow:clip. */
+@supports not (overflow:clip){#home-view,#reader-view,#reader-article{overflow:hidden}html,body{overflow-x:hidden}}
+@media(max-width:760px){
+ :root{--gutter:22px;--chapter-cover-height:clamp(310px,calc(100svh - 183px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)),680px);--mobile-header:calc(65px + env(safe-area-inset-top,0px))}
+ html{scrollbar-gutter:auto;scroll-padding-top:80px}
+ .site-header{height:var(--mobile-header);padding-top:env(safe-area-inset-top,0px);margin:0 var(--gutter);gap:10px}
+ body[data-view="reader"] .site-header{height:var(--mobile-header);padding-top:env(safe-area-inset-top,0px)}
+ .site-header .header-actions,body[data-view="reader"] .header-actions{gap:8px}
+ .site-header .wordmark{font-size:14px;gap:8px}
+ .site-header .sound-toggle,.site-header .icon-button{width:40px;min-width:40px;min-height:44px}
+ .site-header .menu-button{min-height:44px;gap:9px}
+ .site-header .menu-icon{width:18px}
+ #reader-view{padding-top:var(--mobile-header)}
+ .reader-toolbar{min-height:58px;padding:6px 0;gap:10px}
+ .reader-toolbar .mono{font-size:8px}
+ .reader-toolbar .quiet-button{min-height:44px}
+ .hero,.hero.is-exploring{height:100svh;min-height:0;max-height:none}
+ .hero h1{top:clamp(108px,17svh,153px);font-size:clamp(44px,14.4vw,78px);line-height:1.25;padding:0 var(--gutter)}
+ .hero .hero-dock,.hero.is-exploring .hero-dock{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:var(--gutter);right:var(--gutter);gap:8px}
+ .hero-dock .scene-switcher{padding:2px}
+ .hero-dock .scene-switcher button{min-height:38px;font-size:10px;padding:5px 12px}
+ .hero-dock .cosmos-tools{gap:0!important}
+ .hero-dock .cosmos-tools button,.hero-dock .motion-button{width:44px;min-width:44px;min-height:44px;height:44px;font-size:20px}
+ .cover-actions{bottom:calc(83px + env(safe-area-inset-bottom,0px));left:50%;right:auto;transform:translateX(-50%)}
+ .cover-actions .universe-button{min-height:44px;padding:10px 20px;font-size:11px}
+ .resume-link{bottom:calc(133px + env(safe-area-inset-bottom,0px));font-size:10px;min-height:34px}
+ .star-inspector{bottom:calc(139px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 44px)}
+ .hero.is-exploring .constellation-nav{bottom:calc(75px + env(safe-area-inset-bottom,0px));left:var(--gutter);right:var(--gutter);gap:0 7px}
+ .hero.is-exploring .constellation-nav button{min-height:38px;padding:0;font-size:10px}
+ .hero.is-exploring .star-inspector{bottom:calc(169px + env(safe-area-inset-bottom,0px))}
+ .hero.is-exploring .universe-heading{top:104px}
+ .hero.is-exploring .universe-heading h2{font-size:23px}
+ .hero.is-exploring .exit-universe{top:89px}
+ .chapter-cover,body[data-view="reader"][data-reader-theme="dark"] .chapter-cover{height:var(--chapter-cover-height);min-height:var(--chapter-cover-height)!important;padding:32px var(--gutter) 64px;display:block}
+ .chapter-cover-copy{width:100%;max-width:100%;pointer-events:none}
+ .chapter-cover .eyebrow{margin-bottom:17px;font-size:10px}
+ .chapter-cover h1{font-size:clamp(52px,16vw,74px);line-height:1.22;letter-spacing:-.065em;margin-bottom:0}
+ .chapter-cover h1.long-title{font-size:clamp(33px,10.5vw,48px);line-height:1.28;max-width:95%;margin:0;word-break:keep-all;overflow-wrap:anywhere}
+ .chapter-cover-meta{margin-top:19px;font-size:9px;gap:14px}
+ .chapter-cover-meta .mono{font-size:8px}
+ .reader-atmosphere{height:calc(var(--chapter-cover-height) + 170px);max-height:calc(100% - 64px);mask-image:linear-gradient(#000 43%,rgba(0,0,0,.75) 64%,transparent 94%);-webkit-mask-image:linear-gradient(#000 43%,rgba(0,0,0,.75) 64%,transparent 94%)}
+ .reader-atmosphere:after{background:linear-gradient(180deg,var(--reader-bg),transparent 35%)}
+ .chapter-space-controls{bottom:14px;right:var(--gutter);left:auto;display:flex;flex-direction:row;align-items:center;gap:0}
+ .chapter-space-controls button{width:44px;min-width:44px;height:44px;min-height:44px;font-size:20px}
+ .reader-body-grid{padding:25px var(--gutter) 22px}
+ .prose{line-height:1.97}
+ .prose p{margin-bottom:1.45em}
+ #chapter-end:not([data-last="true"]){margin:0 var(--gutter) 25px;padding:24px 0 0}
+ .next-chapter-link{padding-bottom:22px;font-size:27px}
+ .continuum{min-height:clamp(280px,48svh,430px);padding:30px 20px 24px}
+ .continuum-trigger{min-height:215px;gap:25px;padding:22px 10px}
+ .continuum-line{font-size:clamp(21px,6vw,27px)}
+ .contents-section{padding-top:36px;padding-bottom:42px}
+ .contents-intro{margin-top:30px;margin-bottom:20px}
+ .contents-intro p{margin-top:14px}
+ .chapter-preview{margin-bottom:23px}
+ .chapter-preview .preview-figure{height:clamp(190px,59vw,285px);width:100%;margin:0;min-width:0}
+ .chapter-preview>p{font-size:16px}
+ .chapter-row{min-height:79px}
+ .preview-caption{padding-top:9px}
+ .interlude{min-height:0;padding-top:38px;padding-bottom:56px}
+ .about-section{padding-top:35px;padding-bottom:39px}
+ .about-layout{padding-top:26px;gap:22px}
+ .site-footer{padding-top:28px;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px))}
+ .footer-top{padding-bottom:20px}
+ .footer-bottom{padding-top:17px}
+ .reader-bottom-bar{gap:6px;padding-left:var(--gutter);padding-right:var(--gutter)}
+ .reader-position{white-space:nowrap;font-size:9px}
+ .reader-bottom-bar .quiet-button{min-height:44px;gap:6px}
+ .sound-panel{right:-26px;width:200px;max-width:calc(100vw - 32px)}
+ #ending-view .sound-panel{right:-28px}
+ #contents-dialog,#settings-dialog{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
+ #contents-dialog{padding-top:14px;padding-bottom:14px}
+ #contents-dialog .dialog-heading{padding-top:16px;padding-bottom:17px}
+ #dialog-chapters .chapter-row{min-height:60px}
+ #ending-view .ending-finale{bottom:calc(15% + env(safe-area-inset-bottom,0px))}
+}
+@media(max-width:359px){
+ :root{--gutter:16px}
+ .site-header .wordmark{font-size:13px;gap:6px}
+ .site-header .brand-symbol{width:15px;height:15px}
+ .site-header .header-actions,body[data-view="reader"] .header-actions{gap:5px}
+ .site-header .menu-button{gap:6px;font-size:10px}
+ .hero-dock .scene-switcher button{padding:5px 10px}
+ .hero-dock .cosmos-tools button,.hero-dock .motion-button{width:44px;min-width:44px}
+ .hero-dock{gap:4px!important}
+}
+@media(max-height:520px) and (orientation:landscape){
+ .hero,.hero.is-exploring{height:100svh;min-height:0}
+ .hero h1{top:84px;font-size:clamp(38px,6.8vw,68px)}
+ .cover-actions{bottom:18px}
+ .hero.is-exploring .universe-heading{top:79px}
+ .universe-heading h2{font-size:21px;margin-top:8px}
+ .hero.is-exploring .exit-universe{top:73px}
+ .hero.is-exploring .constellation-nav{display:flex;bottom:76px}
+ .hero.is-exploring .constellation-nav button{font-size:9px;gap:4px}
+ .star-inspector,.hero.is-exploring .star-inspector{bottom:130px;width:220px;padding:12px 16px}
+ .star-inspector h3{font-size:20px;margin:6px 0}.star-inspector p{display:none}
+ .chapter-cover,body[data-view="reader"][data-reader-theme="dark"] .chapter-cover{height:clamp(158px,calc(100svh - 174px),300px);min-height:clamp(158px,calc(100svh - 174px),300px)!important;padding:24px var(--gutter) 68px;display:flex;align-items:flex-start}
+ .chapter-cover-copy{width:58%}.chapter-cover-meta{margin-top:12px}.chapter-cover h1{font-size:55px}.chapter-cover h1.long-title{font-size:35px}
+ .reader-atmosphere{height:490px}
+ .chapter-space-controls{bottom:16px}
+ #ending-view .ending-finale{bottom:20%}#ending-view .ending-finale h2{font-size:27px}
+}
+@media print{.hero-dock,.chapter-space-controls,.continuum{display:none!important}#reader-article,#home-view{contain:none;overflow:visible}#reader-view{padding-bottom:0}}
+@media(max-height:520px) and (orientation:landscape){
+ .site-header,body[data-view="reader"] .site-header{height:58px}
+ #reader-view{padding-top:58px}
+ .reader-toolbar{min-height:50px;padding:3px 0}
+ .hero h1{top:87px}
+}
+
+/* v8.1: original full-bleed cover restored. No separate title/artwork rows.
+ * Native scrolling and viewport-scoped painting improvements from v8 are retained.
+ */
+.hero .cosmos-stage{contain:strict;isolation:isolate}
+.hero:not(.is-exploring) .cosmos-stage,
+.hero:not(.is-exploring) #cosmos-canvas,
+.hero:not(.is-exploring) .star-hotspot,
+.reader-art .mini-space,.preview-figure .mini-space{touch-action:pan-y pinch-zoom}
+.hero.is-exploring .cosmos-stage,.hero.is-exploring #cosmos-canvas,
+.hero.is-exploring .star-hotspot{touch-action:none}
+#home-view{contain:none}

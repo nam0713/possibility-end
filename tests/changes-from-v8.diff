@@ -1,0 +1,94 @@
+--- v8/src/cosmos.js
++++ v8.1/src/cosmos.js
+@@ -269,16 +269,10 @@
+         this.camera=6.6/this.zoom;
+       }
+       else if(this.mini){this.center=[this.w*.5,this.h*.49];this.focal=Math.min(this.w,this.h)*1.38;this.camera=6.6/this.zoom;}
+-      else if(!exploring){
+-        // The stage occupies its own grid row below the real rendered title.
+-        // Both axes constrain the camera, keeping the sculpture large on tall phones
+-        // while leaving a real, guaranteed gap above it on short/wide screens.
+-        this.center=[this.w*.5,this.h*.50];
+-        this.focal=Math.min(this.w*(this.form==='ring'?1.09:.92),this.h*(this.form==='ring'?1.57:1.25));
+-        this.camera=7.8/this.zoom;
+-      }
+-      else if(this.w<=760){this.center=[this.w*.50,this.h*.44];this.focal=this.w*(this.form==='ring'?1.18:.88);this.camera=7.8/this.zoom;}
+-      else{this.center=[this.w*.5,this.h*.48];this.focal=Math.min(this.w*.66,this.h)*(this.form==='ring'?.97:.80);this.camera=7.8/this.zoom;}
++      else if(this.w<=760){this.center=[this.w*.50,this.h*(exploring?.44:.49)];this.focal=this.w*(this.form==='ring'?1.18:.88);this.camera=7.8/this.zoom;}
++      else{this.center=[this.w*.5,this.h*(exploring?.48:.535)];this.focal=Math.min(this.w*.66,this.h)*(this.form==='ring'?.97:.80);this.camera=7.8/this.zoom;}
++      // Only the gap changes: preserve v7 framing, scale, title, and exploration.
++      if(!this.mini&&!exploring)this.center[1]+=24;
+       this.matrix=rotation(this.yaw,this.pitch,this.roll);
+     }
+     project(p){const v=transform(this.matrix,p),d=Math.max(1,this.camera-v[2]);return {x:this.center[0]+v[0]*this.focal/d,y:this.center[1]-v[1]*this.focal/d,z:v[2],depth:d};}
+@@ -381,8 +375,9 @@
+       const normal=!hero.classList.contains('is-exploring');
+       for(const b of this.projected){
+         const el=this.hotspotButtons[b.n-1],cache=this.hotspotCache[b.n-1];if(!el)continue;
+-        // In cover mode the canvas already starts below the title and ends above the dock.
+-        const out=b.x<22||b.x>this.w-22||b.y<(normal?22:88)||b.y>this.h-(normal?22:200);
++        // Full-viewport scene: retain the original title/control exclusion zones.
++        const obscured=normal&&b.y<(this.w>760?268:228);
++        const out=b.x<14||b.y<88||b.x>this.w-18||b.y>this.h-(normal?195:200)||obscured;
+         if(el.hidden!==out)el.hidden=out;
+         if(out)continue;
+         const pos=`translate3d(${(Math.round((b.x-22)*2)/2)}px,${(Math.round((b.y-22)*2)/2)}px,0)`;
+--- v8/src/mobile.css
++++ v8.1/src/mobile.css
+@@ -151,53 +151,14 @@
+  .hero h1{top:87px}
+ }
+ 
+-/* V8 — title and artwork own separate grid rows; no fixed-position overlap.
+- * The grid remains one small viewport high. Space is redistributed, not added below.
+- * The scene remains large and interactive; exploration still uses the whole viewport.
++/* v8.1: original full-bleed cover restored. No separate title/artwork rows.
++ * Native scrolling and viewport-scoped painting improvements from v8 are retained.
+  */
+-.hero{
+- --cover-title-top:clamp(118px,16svh,178px);
+- --cover-space-gap:clamp(40px,5svh,58px);
+- --cover-foot:100px;
+- display:grid;grid-template-columns:minmax(0,1fr);
+- grid-template-rows:var(--cover-title-top) auto var(--cover-space-gap) minmax(0,1fr) var(--cover-foot);
+- padding:0;
+-}
+-.hero-content{display:contents}
+-.hero h1{
+- grid-column:1;grid-row:2;position:relative;inset:auto;align-self:start;
+- width:100%;margin:0;min-width:0;padding:0 var(--gutter);
+-}
+-.hero .cosmos-stage{
+- grid-column:1;grid-row:4;position:relative;inset:auto;
+- width:100%;height:100%;min-height:0;min-width:0;
+- contain:strict;isolation:isolate;
+- -webkit-mask-image:linear-gradient(transparent,#000 16px,#000 calc(100% - 16px),transparent);
+- mask-image:linear-gradient(transparent,#000 16px,#000 calc(100% - 16px),transparent);
+-}
+-.hero.is-exploring .cosmos-stage{
+- grid-area:auto;position:absolute;inset:0;width:100%;height:100%;
+- -webkit-mask-image:none;mask-image:none;
+-}
+-/* Native vertical panning and browser pinch zoom are never captured by the scene. */
++.hero .cosmos-stage{contain:strict;isolation:isolate}
+ .hero:not(.is-exploring) .cosmos-stage,
+ .hero:not(.is-exploring) #cosmos-canvas,
+ .hero:not(.is-exploring) .star-hotspot,
+ .reader-art .mini-space,.preview-figure .mini-space{touch-action:pan-y pinch-zoom}
+ .hero.is-exploring .cosmos-stage,.hero.is-exploring #cosmos-canvas,
+ .hero.is-exploring .star-hotspot{touch-action:none}
+-/* Paint containment belongs on the viewport-sized scene, not the entire long home. */
+ #home-view{contain:none}
+-@media(max-width:760px){
+- .hero{
+-  --cover-title-top:clamp(98px,15svh,140px);
+-  --cover-space-gap:32px;
+-  --cover-foot:calc(151px + env(safe-area-inset-bottom,0px));
+- }
+- .hero h1{position:relative;inset:auto;line-height:1.25}
+-}
+-@media(max-height:520px) and (orientation:landscape){
+- .hero{--cover-title-top:78px;--cover-space-gap:20px;--cover-foot:80px}
+- .hero h1{inset:auto;font-size:clamp(34px,5.8vw,51px);line-height:1.15}
+-}
+-@media print{.hero{display:none}}

@@ -1,6 +1,7 @@
 // InputController: pointer parallax (window, passive), explore-mode drag / pinch / wheel / keys on the
-// canvas, and the touch-device scroll hold: while the page is being scrolled on a coarse-pointer
-// device we stop drawing entirely (the compositor owns the scroll) and resume ~150 ms after it settles.
+// canvas, and touch-scroll tracking: while the page is being scrolled on a coarse-pointer device the
+// engine keeps drawing at a 30 fps cap (the compositor owns the scroll) until ~150 ms after it settles;
+// idle work (prewarming, the film build) waits for a quiet moment.
 
 const HOLD_MS = 150;
 

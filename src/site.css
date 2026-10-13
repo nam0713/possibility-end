@@ -101,9 +101,11 @@ section[tabindex="-1"]:focus, footer[tabindex="-1"]:focus { outline: none; }
 main { position: relative; z-index: 1; display: block; outline: none; transition: opacity .34s var(--ease-io); }
 
 /* ── 3. Universe layer & fallback sky ──────────────────────────────────── */
+/* The large viewport: a phone's address bar collapsing or returning mid-scroll never resizes the canvas
+   (the engine frames its compositions in the visible part). */
 #universe-canvas {
-  position: fixed; inset: 0; z-index: 0;
-  display: block; width: 100%; height: 100%;
+  position: fixed; left: 0; top: 0; z-index: 0;
+  display: block; width: 100%; height: 100vh; height: 100lvh;
   pointer-events: none;
 }
 html.exploring #universe-canvas { pointer-events: auto; cursor: grab; touch-action: none; }
@@ -317,6 +319,10 @@ body[data-view="reader"].in-text .rail { opacity: 1; visibility: visible; pointe
 /* Only the buttons take taps: the empty rest of the row lets them through to the ring's nodes. */
 .hero-actions { pointer-events: none; }
 .hero-actions > * { pointer-events: auto; }
+/* Portrait: the buttons fade out on their way up, before they would cross the fixed ring (app.js fadeActions). */
+.hero-actions > * { opacity: var(--fade, 1); }
+.hero-actions.is-faded:not(:focus-within) > * { pointer-events: none; }
+.hero-actions:focus-within > * { opacity: 1; }
 /* The cover's words leave as the next section takes the screen, so they never rest on its formation
    (wide and landscape screens: the column they share; portrait: its band). Keyboard focus brings the
    actions back. */

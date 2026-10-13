@@ -25,7 +25,7 @@ light at the end of ch.8, handed to the film as `focus` + `focusLight`.
 | `camera.js` | Compositions via `setViewOffset`, damped springs (composition, target, focal point), parallax, ambient drift, explore controls; the starfield's reference frame. |
 | `nodes.js` | Cover nodes + the formation's anchor → `subscribe` frames (only when changed), `pick`. |
 | `post.js` | RenderPass → UnrealBloomPass (reduced res) → post-bloom overlay → FinishPass (OutputPass subclass). |
-| `input.js` | Window parallax, explore drag/pinch/wheel/keys, coarse-pointer scroll hold. |
+| `input.js` | Window parallax, explore drag/pinch/wheel/keys, coarse-pointer touch-scroll tracking (30 fps cap). |
 | `quality.js` | Tier detection, GPU timer, adaptive controller. |
 | `film-host.js` | Engine side of the ending film contract (`ending-*.js` belong to the ending agent). |
 
@@ -257,9 +257,16 @@ No stage adds a hue: the grade is neutral, every input colour is in the palette'
 - Renders only while needed: ambient motion (not paused / reduced), morph, camera easing, fades,
   the scatter and arm easing (also while paused, never capped), explore input, the ending film. Stops
   when `document.hidden`, `setVisible(false)`, context lost.
-- Coarse pointers: rendering halts during page scroll and resumes ~150 ms after it settles (touch
-  lifetime tracked); a veil/scene/layout change during the hold draws single frames at the new
-  composition (≤ 5/s); a scatter that is still easing renders through the hold at 30 fps.
+- Coarse pointers (v9.1 mobile fix): a touch scroll never stops the loop — the universe keeps moving
+  under the finger and its fling, capped at 30 fps until ~150 ms after the scroll settles (touch
+  lifetime tracked), so the compositor keeps headroom for the scroll. Scene/layout/veil changes during
+  the scroll simply ease in. (v8–v9.0 halted drawing during a scroll; the cover then froze on every
+  swipe and jumped when it resumed.) A resize that arrives mid-scroll still waits for the end.
+- The canvas is sized to the large viewport (`height: 100lvh`), so a phone's address bar collapsing or
+  returning mid-scroll never resizes it. Compositions are framed in the visible part: `frameHeight`
+  (the window height measured when the canvas size really changes) is passed to the camera rig,
+  which places and sizes layouts in it, top-aligned (`setViewOffset` y = 0.5·H − cy·Hf), and the
+  portrait test, the post glow centre and the starfield calm use it too.
 - Ambient-only frames are capped at 30 fps on coarse pointers, when veiled > 0.6, at adaptive
   level ≥ 3, or in the steady reading starfield (fully scattered: its drift is ≤ 4 px/s).
 - DPR caps 1.75 desktop / 1.5 coarse, plus a pixel budget per tier.

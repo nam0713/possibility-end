@@ -3,8 +3,9 @@
 //
 // The loop only runs while something needs drawing: ambient motion (unless paused / reduced motion),
 // a morph, camera easing, fades, the reading starfield's scatter easing, the seed's arming, explore
-// input or the ending film. It stops when the document is hidden, when setVisible(false), during
-// touch scrolling (except while the scatter eases: then at 30 fps), and while the context is lost.
+// input or the ending film. It stops when the document is hidden, when setVisible(false) and while the
+// context is lost. A touch scroll never stops it (the universe keeps moving under the reader's finger);
+// it only caps drawing at 30 fps so the compositor keeps headroom for the scroll itself.
 //
 // The main thread stays free: formations are built in a Worker (requested ahead, prewarmed by
 // likelihood), every shader program is compiled asynchronously before the first frame, retargets
@@ -391,13 +392,18 @@ export class Engine {
     this.post.uniforms.uGrain.value = tier.grain ? POST.grain : POST.grain * 0.5;
     if (key === this.lastSize) return;
     this.lastSize = key;
+    // The canvas is sized to the large viewport (site.css: 100lvh), so a phone's address bar that
+    // collapses or returns mid-scroll never resizes it. Compositions are framed in the visible part —
+    // the window height measured when the canvas size really changes (load, rotation, a resized
+    // window) — so nothing re-centres while the toolbar moves.
+    if (w !== this.width || h !== this.height || !this.frameHeight) this.frameHeight = Math.min(h, Math.max(1, window.innerHeight || h));
     this.width = w;
     this.height = h;
     this.pixelRatio = pr;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.post.setSize(w, h, pr);
-    this.rig.setViewport(w, h);
+    this.rig.setViewport(w, h, this.frameHeight);
     const u = this.field.uniforms;
     u.uPixelScale.value = (h * pr) / (2 * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV) / 2));
     u.uMinPx.value = Math.max(1.5, 1.45 * pr);
@@ -425,7 +431,7 @@ export class Engine {
     L.y = SCATTER.gain;
     L.z = SCATTER.px * this.pixelRatio;
     L.w = SCATTER.pxBright * this.pixelRatio;
-    u.uScatterMotion.value.w = isTall(this.width, this.height) ? 1 : SCATTER.calm;
+    u.uScatterMotion.value.w = isTall(this.width, this.frameHeight || this.height) ? 1 : SCATTER.calm;
   }
 
   setQuality(q) {
@@ -1039,7 +1045,7 @@ export class Engine {
   // ------------------------------------------------------------------ loop
 
   canRender() {
-    return this.ok && this.visible && !this.contextLost && !this.compiling && !document.hidden && (!this.holding || this.holdFrame || this.film.active || this.input.dragging || this.scatterActive());
+    return this.ok && this.visible && !this.contextLost && !this.compiling && !document.hidden;
   }
 
   request() {
@@ -1053,10 +1059,12 @@ export class Engine {
     this.lastDraw = 0;
   }
 
+  /** A touch scroll began (true) or settled (false). Drawing continues throughout, capped at 30 fps
+   * while the finger and its fling move the page; a resize that arrives mid-scroll waits for the end. */
   onHold(holding) {
     this.holding = holding;
     if (holding) {
-      if (!this.film.active && !this.input.dragging && !this.scatterActive()) this.stopLoop();
+      this.request();
     } else {
       clearTimeout(this.holdFrameTimer);
       this.holdFrameTimer = 0;
@@ -1068,23 +1076,9 @@ export class Engine {
     }
   }
 
-  /**
-   * While a touch scroll holds the loop, a veil/scene/layout change would otherwise stay invisible
-   * until the fling ends (the bright cover under contents text). Draw single frames at the new
-   * composition instead, at most ~5 per second, and only when the change is visible.
-   */
+  /** A veil/scene/layout change during a touch scroll: the loop is running, so it simply eases in. */
   requestHoldFrame() {
-    if (!this.holding || this.holdFrameTimer || !this.ok) return;
-    const due = Math.max(0, 200 - (performance.now() - this.lastHoldFrame));
-    this.holdFrameTimer = setTimeout(() => {
-      this.holdFrameTimer = 0;
-      if (!this.holding) return;
-      // Only the composition and the veil jump; the formation keeps its framing until it moves.
-      if (!this.rig.snapComposition(0.04, 0.01)) return;
-      this.holdFrame = true;
-      this.lastDraw = 0;
-      this.request();
-    }, due);
+    this.request();
   }
 
   frame = (now) => {
@@ -1116,8 +1110,8 @@ export class Engine {
     const holdFrame = this.holdFrame;
     this.holdFrame = false;
     const ambientOnly = this.ambient() && !this.field.morphing && !this.rig.moving && !this.input.dragging && !this.fading && !this.scatterMoving && !this.armMoving;
-    // A touch scroll holds the loop; only the scatter easing (scroll-driven) draws through it, at 30 fps.
-    const holdCap = this.holding && !holdFrame && !this.input.dragging ? 1000 / 30 : 0;
+    // During a touch scroll the universe keeps moving at 30 fps (the compositor owns the scroll).
+    const holdCap = this.holding && !this.input.dragging ? 1000 / 30 : 0;
     // The steady reading starfield (fully scattered) drifts ≤ 4 px/s: 30 fps is plenty there too.
     const cap = Math.max(holdCap, ambientOnly && (this.coarseMQ.matches || this.rig.veil.value > 0.6 || this.adaptive.level >= 3 || this.scatter.value >= 1) ? 1000 / 30 : 0);
     if (!holdFrame && cap && !restart && sinceLast < cap - 3) {
@@ -1247,8 +1241,8 @@ export class Engine {
     const lift = 1 - 0.85 * S;
     pu.uBgLift.value.set(this.bgTint[0] * lift, this.bgTint[1] * lift, this.bgTint[2] * lift);
     this.post.bloom.strength = POST.bloomStrength * (1 - (1 - SCATTER.bloom) * S);
-    pu.uGlowCenter.value.set(this.rig.cx.value, 1 - this.rig.cy.value);
-    const tall = isTall(this.width, this.height);
+    pu.uGlowCenter.value.set(this.rig.cx.value, 1 - (this.rig.cy.value * this.frameHeight) / this.height);
+    const tall = isTall(this.width, this.frameHeight);
     pu.uGlowRadius.value = tall ? 0.42 : 0.55;
 
     // Black hole: the shadow is re-drawn after bloom, with whatever lies in front of it.

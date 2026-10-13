@@ -23,6 +23,7 @@ export class CameraRig {
     this.camera = camera;
     this.W = 1;
     this.H = 1;
+    this.Hf = 1; // visible frame height: compositions are placed and sized in it (top-aligned in H)
     this.tanHalf = Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV) / 2);
     this.layout = 'hero';
     this.spec = null;
@@ -64,9 +65,10 @@ export class CameraRig {
     this._ref = new THREE.Vector3();
   }
 
-  setViewport(W, H) {
+  setViewport(W, H, Hf = H) {
     this.W = W;
     this.H = H;
+    this.Hf = Math.min(H, Hf || H);
     this.camera.aspect = W / H;
     // Composition values depend on the viewport: jump instead of easing on resize.
     this._targets();
@@ -135,13 +137,13 @@ export class CameraRig {
 
   _targets() {
     const L = LAYOUTS[this.layout] || LAYOUTS.hero;
-    const tall = isTall(this.W, this.H);
+    const tall = isTall(this.W, this.Hf);
     const c = tall ? L.tall : L.wide;
     const spec = this.spec;
     const R = spec ? spec.radius : 3;
     // A formation may adjust a layout's composition (e.g. ch.8 steps right of its long title).
     const o = spec && spec.compose && spec.compose[this.layout] ? spec.compose[this.layout][tall ? 'tall' : 'wide'] : null;
-    const rpx = Math.max(40, c.r(this.W, this.H) * (o && o.scale ? o.scale : 1));
+    const rpx = Math.max(40, c.r(this.W, this.Hf) * (o && o.scale ? o.scale : 1));
     const veil = this.veil.value;
     const dist = (R * (this.H / 2)) / (rpx * this.tanHalf) * c.push * (1 + 0.42 * veil);
     this._t = this._t || {};
@@ -254,7 +256,8 @@ export class CameraRig {
       this.target.z + d * Math.cos(yaw) * Math.cos(pitch),
     );
     cam.lookAt(this.target);
-    cam.setViewOffset(this.W, this.H, (0.5 - this.cx.value) * this.W, (0.5 - this.cy.value) * this.H, this.W, this.H);
+    // cy is a share of the visible frame (Hf, top-aligned); the projection spans the whole canvas (H).
+    cam.setViewOffset(this.W, this.H, (0.5 - this.cx.value) * this.W, 0.5 * this.H - this.cy.value * this.Hf, this.W, this.H);
     cam.updateMatrixWorld();
     this.distance = d;
     // Reference frame of the starfield: the same composition, without parallax, sway, explore or zoom.

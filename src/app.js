@@ -772,6 +772,7 @@
     let fallbackQueued = false;
     let pointed = 0;   // the node under the mouse
     let keyed = 0;     // the node with keyboard focus
+    let actionsFade = 1;
 
     /** The cover’s composition: centred while exploring, or (portrait) while a chapter card is open. */
     const coverLayout = () => (exploring || (selected && isTall()) ? 'explore' : 'hero');
@@ -932,8 +933,34 @@
       p.side = out; p.shift = 0; p.terse = g.terse; p.bottom = 0;
     }
 
+    /** Portrait screens: the ring stays where the universe draws it while the cover scrolls, and the
+     * cover's buttons sit below it. They fade out on their way up, gone before they would cross the
+     * ring (or its lowest label), and return on the way back. At the top of the page they are whole. */
+    function fadeActions() {
+      const row = hero.querySelector('.hero-actions');
+      let fade = 1;
+      const frame = lastFrame;
+      if (isTall() && heroActive && !exploring && !selected && frame && frame.nodes && (frame.scene === undefined || frame.scene === 'cover')) {
+        let ring = -Infinity;
+        for (const n of frame.nodes) if (Number.isFinite(n.y)) ring = Math.max(ring, n.y + Math.max(18, (Number(n.radius) || 0) + 10));
+        ring = Math.max(ring, labelFloor || 0) + 10;
+        if (ring > -Infinity) {
+          const gap = row.getBoundingClientRect().top - ring;          // now
+          const rest = gap + scrollY;                                     // at the top of the page
+          // (At the top of the page they are always whole; scrolled, touching the ring means gone.)
+          fade = scrollY <= 0 ? 1 : gap <= 0 ? 0 : clamp(gap / Math.min(96, Math.max(1, rest)));
+        }
+      }
+      fade = Math.round(fade * 100) / 100;
+      if (fade === actionsFade) return;
+      actionsFade = fade;
+      row.style.setProperty('--fade', String(fade));
+      row.classList.toggle('is-faded', fade < 0.35);
+    }
+
     function placeNodes(frame) {
       lastFrame = frame;
+      fadeActions();
       if (!frame || !frame.nodes) return;
       const show = body.dataset.view === 'home' && heroActive && (frame.scene === undefined || frame.scene === 'cover');
       if (nodeLayer.classList.contains('is-shown') !== show) nodeLayer.classList.toggle('is-shown', show);
@@ -1518,6 +1545,7 @@
       fadeInterlude(isTall() && next !== 'hero');
       setSection(next, force);
       measureFloor();
+      fadeActions();
     }
 
     /** The cover's own text (node labels, the chapter card) gives way to the contents' first line

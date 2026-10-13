@@ -25,6 +25,7 @@ light at the end of ch.8, handed to the film as `focus` + `focusLight`.
 | `accents/*.js` | Non-particle accents (lines with travelling pulses, glows, star, black hole, cover nodes) with cross-faded presence. |
 | `camera.js` | Compositions via `setViewOffset`, damped springs (composition, target, focal point), parallax, ambient drift, explore controls; the starfield's reference frame. |
 | `nodes.js` | Cover nodes + the formation's anchor → `subscribe` frames (only when changed), `pick`. |
+| `focus.js` | The cover's chapter dial (`focusNode`): the node orbit's spin, the front angle, the turn spring. |
 | `post.js` | RenderPass → UnrealBloomPass (reduced res) → post-bloom overlay → FinishPass (OutputPass subclass). |
 | `input.js` | Window parallax, explore drag/pinch/wheel/keys, coarse-pointer touch-scroll tracking (30 fps cap). |
 | `quality.js` | Tier detection, GPU timer, adaptive controller. |
@@ -288,6 +289,56 @@ floor (r < 0.8, `seed.js`), so no arc fragment crosses into a light of its own a
 grows (×1.1), its halo ×1.6 and its breath deepens, eased (`EASE.arm` 0.32 s). Only the seed accent
 reacts, so it is a no-op elsewhere.
 
+## Cover chapter dial — `Universe.focusNode(n)` (amendment 3)
+
+The phone cover's dial (`design/V9.1-FEEDBACK.md`, amendment 3). `focusNode(n)` with n = 1…8 turns the
+ring of nodes so node n arrives at the **front** of its orbit and highlights it exactly as `select(n)`
+does; `focusNode(0)` releases it to free rotation. Desktop is untouched unless the UI calls it (free
+rotation is the same formula as before: spin = living time × `RING.nodeOrbit.speed`).
+
+- **What turns.** Only the nodes, along their own orbit (node i at orbit angle (i/8)·τ + phase + spin;
+  `focus.js` owns the spin). The ribbon, the composition, the camera and the orbit line stay exactly as
+  they are, so the cover keeps its look and every node's projection stays exact. Next to the front,
+  node n+1 sits to the **right** (lower right) and n−1 to the left, so “next chapter” = the ring turning
+  right → left (a leftward swipe). Measured at 390×844 (`hero`, tall): the front node at ≈ (205, 680)
+  CSS px, n+1 at ≈ (320, 645), n−1 at ≈ (82, 640); the nodes keep their 45° spacing.
+- **Front** = the orbit's lowest point on screen for the composition camera (the layout's view yaw and
+  pitch, explore rotation and zoom; never pointer parallax or the ambient sway, which stay as gentle
+  life around the held node). It is solved in closed form every frame (stationary point of the screen
+  height along the orbit) — ~11° from the geometrically nearest point, because the orbit is tilted;
+  when the camera looks from below the orbit plane it falls back to the nearest point. While held, the
+  node breathes ±0.02 rad (≈ ±3 px) along its orbit and follows the front (an explore drag or a layout
+  change eases it back to the front with the same spring); it never drifts away.
+- **Timing.** A critically damped spring (`EASE.focus` 0.27 s smooth time): ~90 % of the turn in
+  0.55 s, within 1 px at ≈ 0.9 s, settled (`focusMoving` false) by ≈ 1.0–1.2 s. A call while turning
+  retargets from the current angle *and velocity* toward the nearest equivalent angle — the shortest
+  way round (≤ 4 steps, either direction) — so rapid swipes chain smoothly. A release keeps the angle
+  and fades the leftover speed into the free orbit speed (0.3 s), no jump. Reduced motion: instant (no
+  breath). Also instant while the nodes are not on screen (cover accent presence < 0.05: before the
+  cover has arrived, or fully scattered) — nothing to watch turn.
+- **Highlight.** `focusNode(n)` sets the selection to n (`getState().selected`, subscribe `selected`).
+  `focusNode(0)` clears it unless `select()` changed it since. `select(m)` while focused only moves
+  the highlight; the dial stays on n.
+- **Scenes.** Accepted only on the `cover` scene (any layout, any scatter); elsewhere `focusNode(n)` is
+  a no-op returning `false`. Leaving the cover (`setScene` to any other scene) releases the dial and the
+  highlight it set; coming back starts free — the UI calls `focusNode` again. Before `mount` the call is
+  remembered for a pending cover scene (applied with it, instantly); without WebGL it is a no-op
+  (`false`, `focusedNode: 0`).
+- **Loop.** The turn renders even while paused (like the scatter) and is never subject to the ambient
+  30 fps cap; under a touch-scroll hold it renders at the hold's 30 fps until settled. Subscribe
+  frames carry the moving nodes every rendered frame (~60 per second during a turn on a phone, then
+  the ambient cadence). Context loss mid-turn: the state lives in JS; it resumes and settles on
+  restore.
+- **Returns / state.** `focusNode` returns whether it applied. `getState().focusedNode` (0 = free;
+  also in the no-WebGL state) and `focusMoving` (diagnostic: turning).
+
+Verified (RTX 2060, `--gpu --mobile` 390×844, the real site at `#home` and the lab): for k = 1…8 node k
+is the lowest visible node 1.5 s after the call, the highlight and `frame.selected` follow, subscribe
+frames keep arriving during the turn; rapid 3 → 7 → 2 (130 ms apart) ends on 2 via the shortest way;
+`0` releases (selection cleared, no jump). Also: paused (turns, settles), reduced motion (front on the
+next frame), context loss mid-turn, a call while fully scattered then gathering, explore with the camera
+yawed 1.2 rad (still front), leaving to ch.3 (released; `focusNode(3)` there → `false`), `?nowebgl=1`.
+
 ## Rendering & post
 
 Light renders additively into a half-float target on black. UnrealBloomPass runs at a fraction of
@@ -301,7 +352,7 @@ and grain. No stage adds a hue: the grade is neutral; colour comes from the inpu
 ## Loop & performance
 
 - Renders only while needed: ambient motion (not paused / reduced), morph, camera easing, fades,
-  the scatter and arm easing (also while paused, never capped), explore input, the ending film. Stops
+  the scatter, arm and dial (`focusNode`) easing (also while paused, never capped), explore input, the ending film. Stops
   when `document.hidden`, `setVisible(false)`, context lost.
 - Coarse pointers (v9.1 mobile fix): a touch scroll never stops the loop — the universe keeps moving
   under the finger and its fling, capped at 30 fps until ~150 ms after the scroll settles (touch
@@ -400,8 +451,8 @@ passes 80 %), never during reading.
 
 ## Diagnostics & lab
 
-`getState()` returns the contract fields (now including `scatter`, also 0 without WebGL) plus
-`formation, pendingFormation, morphing, morph, reducedMotion, selected, pixelRatio, adaptiveLevel,
+`getState()` returns the contract fields (now including `scatter` and `focusedNode`, both 0 without
+WebGL) plus `formation, pendingFormation, morphing, morph, reducedMotion, selected, focusMoving, pixelRatio, adaptiveLevel,
 adaptive {level, mode, metric, cadence, backoff}, gpuTimer, particlesTotal, bloom, veil, reading,
 zoom, scatterTarget, scatterStars, armed, holding, compiling, worker, gpuBake, cached, lastBuildMs,
 lastBakeMs, size`. `Universe._debug` (not contract): `settle()`, `setMorph(p, hold)`,
@@ -409,10 +460,12 @@ lastBakeMs, size`. `Universe._debug` (not contract): `settle()`, `setMorph(p, ho
 `engine.filmDof` switch the handover variants).
 
 Lab URL flags: `?scene=&chapter=&layout=&quality=&adaptive=0&settle=1&reading=&veil=&scatter=&arm=1
-&paused=1&time=&select=&ui=0&nodes=0&guides=1&nowebgl=1` (the panel has scatter and arm controls). The node overlay also draws the anchor (crosshair) and the
+&paused=1&time=&select=&focus=&ui=0&nodes=0&guides=1&nowebgl=1` (the panel has scatter and arm controls, and
+a `focus` select with ◀ ▶ buttons for the dial). The node overlay also draws the anchor (crosshair) and the
 status line prints it. `window.lab.still(scene, chapter, layout, t, scatter?)` gives deterministic stills for
 `tools/shot.mjs --eval/--steps`; `lab.scatter(v, settle?)` drives the scatter; `lab.nodes()`,
-`lab.anchor()`, `lab.frames()` read the subscription.
+`lab.anchor()`, `lab.frames()` read the subscription; `lab.focus(n)` calls `focusNode`, `lab.front()`
+returns the lowest visible node.
 
 ## Known limits
 

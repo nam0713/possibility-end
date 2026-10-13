@@ -42,6 +42,10 @@
   const tallQuery = matchMedia('(max-width: 639px), (max-aspect-ratio: 4/5)');
   const isTall = () => tallQuery.matches;
   const coarseQuery = matchMedia('(pointer: coarse)');
+  /* Phones: a coarse pointer and the portrait test, held upright (a small phone turned sideways is
+   * narrow enough for the portrait test, but has no room for the dial: it keeps the wide cover).
+   * They get the chapter dial on the cover (design/V9.1-FEEDBACK.md, amendment 3). */
+  const dialQuery = matchMedia('(pointer: coarse) and (max-width: 639px) and (orientation: portrait), (pointer: coarse) and (max-aspect-ratio: 4/5)');
   /** A pointer that really hovers (a touch screen's :hover sticks to the last tapped element). */
   const hoverQuery = matchMedia('(hover: hover)');
   /** Portrait or short screens show the chapter readout as a bottom sheet (see site.css). */
@@ -283,6 +287,21 @@
       interactive(on) { once('interactive', !!on, () => call('setInteractive', !!on)); },
       paused(on) { once('paused', !!on, () => call('setPaused', !!on)); },
       select(n) { once('select', n || 0, () => call('select', n || 0)); },
+      /** The phone cover's chapter dial (design/V9.1-FEEDBACK.md, amendment 3): turn the ring until
+       * node n is at the front, lit as by select(n), and hold it there; 0 releases the ring. Sent on
+       * every change of the dial (the engine eases and retargets). An engine without it still lights
+       * the node. Either way the engine's selection is now n, which the next select() must know. */
+      focusNode(n, force = false) {
+        const value = n || 0;
+        const u = api();
+        if (force) memo.delete('focusNode');
+        once('focusNode', value, () => {
+          if (u && typeof u.focusNode === 'function') call('focusNode', value);
+          // (Released: no node stays lit either.)
+          if (!value || !u || typeof u.focusNode !== 'function') call('select', value);
+        });
+        memo.set('select', JSON.stringify(value));
+      },
       pointer(x, y) { call('setPointer', x, y); },
       reset() { call('reset'); },
       zoom(f) { call('zoom', f); },
@@ -459,17 +478,47 @@
     const scatter = v => setVar('--scatter', v);
     // The figure glides to its composition: the fallback nodes follow when it arrives.
     figure.addEventListener('transitionend', e => { if (e.target === figure && e.propertyName !== 'opacity') home.placeFallbackNodes(); });
+    /* The phone cover's chapter dial turns the fallback ring as well: the nodes glide along the
+     * drawn orbit (the ring of dots is uniform, so only the nodes move) until the chosen node rests
+     * at the front (angle π/2, the nearest point), the next chapter to its right as in the
+     * universe. `dialPhase` is the chapter at the front (fractional while turning); null: the
+     * nodes keep their usual places (wide screens). Eased critically (~0.9 s), retargeted by every
+     * step; still screens jump. */
+    let dialPhase = null;
+    let dialTarget = 1;
+    let dialFrame = 0;
+    let dialTime = 0;
+    function turn(now) {
+      const dt = Math.min(0.1, (now - dialTime) / 1000);
+      dialTime = now;
+      const diff = dialTarget - dialPhase;
+      dialPhase = Math.abs(diff) < 0.002 ? dialTarget : dialPhase + diff * (1 - Math.exp(-dt / 0.17));
+      home.placeFallbackNodes(false);
+      dialFrame = dialPhase === dialTarget ? 0 : requestAnimationFrame(turn);
+    }
+    /** n: the chapter to bring to the front; null: back to the usual ring. */
+    function dial(n) {
+      cancelAnimationFrame(dialFrame);
+      dialFrame = 0;
+      if (!n) { dialPhase = null; return; }
+      if (dialPhase === null || isCalm()) { dialPhase = dialTarget = n; return; }
+      // The shortest way round (8 → 1 is one step).
+      dialTarget = dialPhase + ((((n - dialPhase) % 8) + 12) % 8 - 4);
+      dialTime = performance.now();
+      dialFrame = requestAnimationFrame(turn);
+    }
     /** Node positions on the fallback ring, in viewport px (the figure is a square box). */
     function nodes() {
       const box = figure.getBoundingClientRect();
       if (!box.width) return [];
       const scale = box.width / 1000;
       return chapters.map(c => {
-        const [x, y, depth] = ringPoint(nodeAngle(c.number), RING.r * RING.orbit);
+        const angle = dialPhase === null ? nodeAngle(c.number) : Math.PI / 2 - (c.number - dialPhase) * Math.PI / 4;
+        const [x, y, depth] = ringPoint(angle, RING.r * RING.orbit);
         return { n: c.number, x: box.left + x * scale, y: box.top + y * scale, radius: 5, depth, visible: true };
       });
     }
-    return { init, show, layout, veil, scatter, nodes };
+    return { init, show, layout, veil, scatter, nodes, dial };
   })();
 
   /** Every scene change drives both the universe and its fallback. */
@@ -773,13 +822,21 @@
     let pointed = 0;   // the node under the mouse
     let keyed = 0;     // the node with keyboard focus
     let actionsFade = 1;
+    let dialFade = 1;
+    /* The phone cover (design/V9.1-FEEDBACK.md, amendment 3): a chapter dial under the ring. */
+    let dialOn = false;    // phones: coarse pointer and the portrait test (isDial)
+    let dialN = 1;         // the chapter at the front of the ring
+    let dialSent = -1;     // what the universe was last asked to hold at the front (0: released)
 
-    /** The cover’s composition: centred while exploring, or (portrait) while a chapter card is open. */
-    const coverLayout = () => (exploring || (selected && isTall()) ? 'explore' : 'hero');
+    /** The cover’s composition: centred while exploring, or (portrait) while a chapter card is open.
+     * Phones with the dial: always centred (the ring higher, the dial and the actions below it). */
+    const coverLayout = () => (dialOn || exploring || (selected && isTall()) ? 'explore' : 'hero');
 
     /** Light node n in the universe (0: the selection, if any); the ring holds still while a node
-     * is pointed at or keyboard-focused. Labels make room for the lit node at once. */
+     * is pointed at or keyboard-focused. Labels make room for the lit node at once. (The dial lights
+     * its own node through Universe.focusNode; nothing else lights one meanwhile.) */
     function light(n) {
+      if (dialOn) { if (lastFrame) placeNodes(lastFrame); return; }
       universe.select(n);
       holdMotion(!!(pointed || keyed));
       if (lastFrame) placeNodes(lastFrame);
@@ -797,7 +854,8 @@
         button.setAttribute('aria-controls', 'readout');
         button.setAttribute('aria-label', `${pad(c.number)} ${c.short} — ${c.kicker}`);
         button.innerHTML = `<span class="node-ring" aria-hidden="true"></span><span class="node-label" aria-hidden="true"><span class="mono">${pad(c.number)}</span><span class="node-name">${escapeHTML(c.short)}</span></span>`;
-        button.addEventListener('click', () => select(selected === c.number ? 0 : c.number));
+        // (Phones: tapping a node turns the dial to its chapter; no card opens.)
+        button.addEventListener('click', () => (dialOn ? setDial(c.number) : select(selected === c.number ? 0 : c.number)));
         // Pointing at or keyboard-focusing a node lights it and holds the ring still (a stable
         // target). Focus that only follows a tap or a click (the card's ✕ returns focus to its node)
         // lights nothing: the highlight belongs to the open card alone.
@@ -833,7 +891,10 @@
       // The title's glyphs (each line's own box), not the whole heading block.
       g.title = copyHidden ? [] : $$('#cover-title .ht-line > span').map(rectOf).filter(Boolean);
       g.obstacles = [];
-      if (!copyHidden) for (const id of ['start-reading', 'resume', 'explore-open']) { const r = rectOf($(id)); if (r) g.obstacles.push(r); }
+      // (Portrait: buttons that have faded on their way over the ring no longer stand in its way.)
+      if (!copyHidden && actionsFade >= 0.35) for (const id of ['dial-read', 'start-reading', 'resume', 'explore-open']) { const r = rectOf($(id)); if (r) g.obstacles.push(r); }
+      // The dial's chapter and dots (phones).
+      if (dialOn && !copyHidden && dialFade >= 0.35) for (const id of ['dial-now', 'dial-dots']) { const r = rectOf($(id)); if (r) g.obstacles.push(r); }
       if (exploring) {
         const r = rectOf($('explore-bar')); if (r) g.obstacles.push(r);
         // (Short landscape screens set the hint apart from the tools, at the lower left.)
@@ -938,28 +999,97 @@
      * ring (or its lowest label), and return on the way back. At the top of the page they are whole. */
     function fadeActions() {
       const row = hero.querySelector('.hero-actions');
-      let fade = 1;
+      const dial = $('dial');
+      let fade = 1, fadeDial = 1;
       const frame = lastFrame;
-      if (isTall() && heroActive && !exploring && !selected && frame && frame.nodes && (frame.scene === undefined || frame.scene === 'cover')) {
+      const onCover = frame && frame.nodes && (frame.scene === undefined || frame.scene === 'cover');
+      // (Scrolled on past the cover — the next section has the screen, or the ring is already
+      // turning into its formation — they stay gone: the section's own fade takes them from here,
+      // and nothing flashes back over the ring meanwhile.)
+      if (isTall() && !exploring && !selected && scrollY > 0 && (!heroActive || section !== 'hero' || !onCover)) fade = fadeDial = 0;
+      else if (isTall() && heroActive && !exploring && !selected && onCover) {
         let ring = -Infinity;
         for (const n of frame.nodes) if (Number.isFinite(n.y)) ring = Math.max(ring, n.y + Math.max(18, (Number(n.radius) || 0) + 10));
         ring = Math.max(ring, labelFloor || 0) + 10;
         if (ring > -Infinity) {
-          const gap = row.getBoundingClientRect().top - ring;          // now
-          const rest = gap + scrollY;                                     // at the top of the page
           // (At the top of the page they are always whole; scrolled, touching the ring means gone.)
-          fade = scrollY <= 0 ? 1 : gap <= 0 ? 0 : clamp(gap / Math.min(96, Math.max(1, rest)));
+          const fadeAt = top => {
+            const gap = top - ring;                 // now
+            const rest = gap + scrollY;             // at the top of the page
+            return scrollY <= 0 ? 1 : gap <= 0 ? 0 : clamp(gap / Math.min(96, Math.max(1, rest)));
+          };
+          fade = fadeAt(row.getBoundingClientRect().top);
+          // The dial rests just under the ring, so it gives way within its first few pixels of
+          // travel (the ring at rest is measured as the dial's own floor: dialFloor).
+          if (dialOn) {
+            const top = dial.getBoundingClientRect().top;
+            const gap = top - dialFloor - 2, rest = gap + scrollY;
+            fadeDial = scrollY <= 0 ? 1 : gap <= 0 ? 0 : clamp(gap / Math.min(96, Math.max(1, rest)));
+          }
         }
       }
       fade = Math.round(fade * 100) / 100;
+      fadeDial = Math.round(fadeDial * 100) / 100;
+      if (fadeDial !== dialFade) {
+        if ((fadeDial < 0.35) !== (dialFade < 0.35)) geometryStale = true;
+        dialFade = fadeDial;
+        dial.style.setProperty('--fade', String(fadeDial));
+        dial.classList.toggle('is-faded', fadeDial < 0.35);
+      }
       if (fade === actionsFade) return;
+      if ((fade < 0.35) !== (actionsFade < 0.35)) geometryStale = true;
       actionsFade = fade;
       row.style.setProperty('--fade', String(fade));
       row.classList.toggle('is-faded', fade < 0.35);
     }
 
+    /* The dial rests just under the ring: below the lowest point of the nodes' orbit (fitted to the
+     * eight nodes, so it holds still while the ring turns) and the front node's lit ring, and above
+     * the cover's actions. It is placed in the cover's own coordinates (the ring is fixed on screen;
+     * the cover scrolls), so it travels with the page and fades before it would reach the ring. */
+    let dialFloor = 0;
+    let dialTop = NaN;
+    let dialHeights = null;   // the dial's height, full and snug (measured again when its copy or the screen changes)
+    const DIAL_GAP = 28, DIAL_GAP_MIN = 14;
+    function placeDial(frame) {
+      let floor = -Infinity;
+      for (const n of frame.nodes) {
+        if (n.visible === false || !Number.isFinite(n.y)) continue;
+        floor = Math.max(floor, n.y + Math.max(12, (Number(n.radius) || 0) * 3.4));
+      }
+      const orbit = orbitOf(frame.nodes);
+      if (orbit) floor = Math.max(floor, orbit.cy + Math.hypot(orbit.uy, orbit.vy) + 12);
+      if (!Number.isFinite(floor)) return;
+      dialFloor = Math.round(floor);
+      const dial = $('dial');
+      const row = hero.querySelector('.hero-actions');
+      // (Cover coordinates = screen coordinates at the top of the page: the cover starts the page.)
+      // (Its laid-out place: not the few pixels it rises by in the cover's entrance.)
+      const rowTop = row.offsetParent === hero ? row.offsetTop : row.getBoundingClientRect().top - hero.getBoundingClientRect().top;
+      const room = rowTop - 14 - dialFloor;   // between the ring and the actions
+      // Short of room: the snug dial (a smaller title, tighter dots), then the least gap.
+      if (!dialHeights) {
+        const was = dial.classList.contains('is-snug');
+        dial.classList.remove('is-snug');
+        const full = dial.offsetHeight;
+        dial.classList.add('is-snug');
+        dialHeights = { full, snug: dial.offsetHeight };
+        dial.classList.toggle('is-snug', was);
+      }
+      const snug = room < dialHeights.full + DIAL_GAP_MIN;
+      if (dial.classList.contains('is-snug') !== snug) { dial.classList.toggle('is-snug', snug); geometryStale = true; }
+      const h = snug ? dialHeights.snug : dialHeights.full;
+      const top = Math.round(Math.max(dialFloor + DIAL_GAP_MIN, Math.min(dialFloor + DIAL_GAP, rowTop - 14 - h)));
+      if (top !== dialTop) {
+        dialTop = top;
+        hero.style.setProperty('--dial-top', `${top}px`);
+        geometryStale = true;
+      }
+    }
+
     function placeNodes(frame) {
       lastFrame = frame;
+      if (dialOn && frame && frame.nodes && body.dataset.view === 'home' && (frame.scene === undefined || frame.scene === 'cover')) placeDial(frame);
       fadeActions();
       if (!frame || !frame.nodes) return;
       const show = body.dataset.view === 'home' && heroActive && (frame.scene === undefined || frame.scene === 'cover');
@@ -1005,7 +1135,7 @@
         // pointed at or keyboard-focused: the universe's ring and the focus outline both grow there).
         // The selected node also wears the universe's selection ring, 3–3.5 node radii out with a
         // soft edge (accents/cover.js): its lit number stays outside that ring.
-        const isSel = node.n === selected;
+        const isSel = node.n === (dialOn ? dialN : selected);
         const isLit = isSel || node.n === keyed || node.n === pointed;
         const radius = Number(node.radius) || 0;
         let lo = Math.round(Math.max(18, radius + 10) + (isLit ? 4 : 0));
@@ -1212,23 +1342,40 @@
       }
     }
 
-    /** Fallback positions when the universe is not rendering. */
-    function placeFallbackNodes() {
-      geometryStale = true;
-      if (!universe.live) placeNodes({ scene: 'cover', nodes: sky.nodes(), selected });
+    /** Fallback positions when the universe is not rendering. (`stale`: measure the obstacles
+     * again; the fallback dial's turn, frame by frame, does not.) */
+    function placeFallbackNodes(stale = true) {
+      if (stale) geometryStale = true;
+      if (!universe.live) placeNodes({ scene: 'cover', nodes: sky.nodes(), selected: dialOn ? dialN : selected });
       placeReadout();
+    }
+
+    /** The lit node: the open card's (wide screens) or the dial's (phones). Nodes disclose the card
+     * only where there is one. */
+    function markNodes() {
+      const lit = dialOn ? dialN : selected;
+      for (const button of nodeButtons) {
+        const n = Number(button.dataset.chapter);
+        button.classList.toggle('is-selected', n === lit);
+        if (dialOn) {
+          button.removeAttribute('aria-expanded');
+          button.removeAttribute('aria-controls');
+          if (n === lit) button.setAttribute('aria-current', 'true'); else button.removeAttribute('aria-current');
+        } else {
+          button.setAttribute('aria-expanded', String(n === selected));
+          button.setAttribute('aria-controls', 'readout');
+          button.removeAttribute('aria-current');
+        }
+      }
     }
 
     function select(n, { focusNode = false } = {}) {
       const previous = selected;
       selected = n;
-      // (Closing a card leaves only a pointed-at or keyboard-focused node lit.)
-      universe.select(n || keyed || pointed);
-      for (const button of nodeButtons) {
-        const on = Number(button.dataset.chapter) === n;
-        button.setAttribute('aria-expanded', String(on));
-        button.classList.toggle('is-selected', on);
-      }
+      // (Closing a card leaves only a pointed-at or keyboard-focused node lit. The dial lights its
+      // own node and opens no card.)
+      if (!dialOn) universe.select(n || keyed || pointed);
+      markNodes();
       const readout = $('readout');
       geometryStale = true;
       if (!n) {
@@ -1275,6 +1422,192 @@
         const from = isCompactScreen() ? 'translateY(24px)' : 'translateY(8px)';
         readout.animate([{ opacity: 0, transform: from }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.16,1,.3,1)' });
       }
+    }
+
+    /* ── The chapter dial (phones: a coarse pointer and the portrait test; design/V9.1-FEEDBACK.md,
+     * amendment 3). The ring turns one chapter per step under a horizontal swipe, a dot, a node or
+     * the quiet 이전 장 / 다음 장 buttons (keyboard, screen readers); the chapter at the front is
+     * named below the ring and 이 장 읽기 opens it (at its saved place, if it has one: router). The
+     * universe holds that node at the front (Universe.focusNode) while the cover is on screen and
+     * lets the ring go (focusNode(0)) whenever the cover is left. ── */
+    const isDial = () => dialQuery.matches;
+    const wrap = n => ((n - 1 + LAST * 4) % LAST) + 1;
+    const dialDots = [];
+
+    function buildDial() {
+      const dots = $('dial-dots');
+      for (const c of chapters) {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'dial-dot';
+        dot.dataset.chapter = c.number;
+        dot.setAttribute('aria-label', `${pad(c.number)} ${c.short}`);
+        dot.innerHTML = '<i aria-hidden="true"></i>';
+        dot.addEventListener('click', () => setDial(c.number));
+        dots.appendChild(dot);
+        dialDots.push(dot);
+      }
+      // The dots are one stop in the Tab order; arrow keys, Home and End move along them.
+      dots.addEventListener('keydown', e => {
+        const keys = { ArrowRight: dialN + 1, ArrowDown: dialN + 1, ArrowLeft: dialN - 1, ArrowUp: dialN - 1, Home: 1, End: LAST };
+        if (!(e.key in keys) || e.altKey || e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        setDial(keys[e.key]);
+        dialDots[dialN - 1].focus();
+      });
+      $('dial-prev').addEventListener('click', () => setDial(dialN - 1));
+      $('dial-next').addEventListener('click', () => setDial(dialN + 1));
+      bindSwipe();
+    }
+
+    /** Show chapter n in the dial. `dir` (+1 next, −1 previous) slides the new name in from that side. */
+    function renderDial(dir = 0, announce = false) {
+      const c = chapterOf(dialN);
+      const progress = progressLabel(dialN);
+      $('dial-num').textContent = pad(dialN);
+      $('dial-kicker').textContent = c.kicker;
+      $('dial-meta').textContent = `약 ${c.minutes}분${progress ? ` · ${progress}` : ''}`;
+      const title = $('dial-title');
+      title.textContent = c.short;
+      if (title.classList.contains('is-long') !== c.short.length > 6) { title.classList.toggle('is-long', c.short.length > 6); dialHeights = null; }
+      dialDots.forEach((dot, i) => {
+        const on = i + 1 === dialN;
+        if (on) dot.setAttribute('aria-current', 'true'); else dot.removeAttribute('aria-current');
+        dot.tabIndex = on ? 0 : -1;
+      });
+      const read = $('dial-read');
+      read.href = `#chapter-${dialN}`;
+      // (The accessible name starts with the visible words, WCAG 2.5.3.)
+      read.setAttribute('aria-label', `이 장 읽기 — ${pad(dialN)}. ${c.short}${progress ? `, ${progress}` : ''}`);
+      if (announce) $('dial-live').textContent = `${pad(dialN)} ${c.short} — ${c.kicker}, 약 ${c.minutes}분${progress ? `, ${progress}` : ''}`;
+      markNodes();
+      if (dir && !isCalm()) {
+        $('dial-now').animate?.([{ opacity: 0, translate: `${dir * 18}px 0` }, { opacity: 1, translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(.16,1,.3,1)' });
+      }
+    }
+
+    /** Turn the dial to chapter n (wrapping: the ring has no ends). */
+    function setDial(n, { announce = true } = {}) {
+      const next = wrap(n);
+      if (next === dialN) return;
+      // (Which way the name slides: the shorter way round, as the ring turns.)
+      const ahead = (next - dialN + LAST) % LAST;
+      const dir = ahead === 0 ? 0 : ahead <= LAST / 2 ? 1 : -1;
+      dialN = next;
+      renderDial(dir, announce);
+      sky.dial(dialOn ? dialN : null);
+      if (!universe.live) placeFallbackNodes(false);
+      syncFocus();
+      if (lastFrame) placeNodes(lastFrame);
+    }
+
+    /** Hold the dial's node at the front while the cover is the page's own (its section, the home
+     * view, no explore); release the ring otherwise. */
+    function syncFocus() {
+      const want = dialOn && body.dataset.view === 'home' && section === 'hero' && !exploring ? dialN : 0;
+      if (want === dialSent) return;
+      const fresh = dialSent === -1;   // (a new page, or a new engine: send it whatever was sent before)
+      dialSent = want;
+      universe.focusNode(want, fresh);
+    }
+
+    /** Phones ↔ everything else (a turn of the device, a pointer attached): the dial and its
+     * centred ring, or the cover as it is on wide screens. */
+    function updateMode(force = false) {
+      const on = isDial();
+      if (on === dialOn && !force) return;
+      dialOn = on;
+      root.classList.toggle('has-dial', on);
+      if (on) {
+        if (exploring) exitExplore({ focus: false });
+        if (selected) select(0);
+      }
+      sky.dial(on ? dialN : null);
+      markNodes();
+      dialHeights = null;
+      geometryStale = true;
+      fitActions();
+      if (body.dataset.view === 'home' && section === 'hero') compose(coverLayout());
+      syncFocus();
+      placeFallbackNodes();
+    }
+
+    /* Swipes over the ring and the dial. Vertical movement stays the page's own scroll (the cover is
+     * touch-action: pan-y in dial mode); the axis is decided once the finger has moved ~10 px. A
+     * horizontal swipe turns one chapter per step of travel as it goes (a long swipe may turn
+     * several), and on release a short quick flick that has not turned yet turns exactly one. Left
+     * brings the next chapter (it waits to the right of the front node), right the previous. */
+    let swiped = 0;   // when a swipe last turned the dial (the tap that ends it is not a click)
+    function bindSwipe() {
+      let touch = null;
+      const nameplate = $('dial-now');
+      const stepPx = () => clamp(innerWidth * 0.32, 90, 150);
+      const drag = px => { nameplate.style.translate = px ? `${px.toFixed(1)}px 0` : ''; nameplate.style.opacity = px ? String(1 - Math.min(0.45, Math.abs(px) / 80)) : ''; };
+      /** The ring and the dial: from just above the ring's highest node to the dial's dots. */
+      function inZone(x, y) {
+        if (!dialOn || exploring || section !== 'hero' || body.dataset.view !== 'home' || dialFade < 0.35) return false;
+        let top = innerHeight * 0.2;
+        if (lastFrame?.nodes) for (const n of lastFrame.nodes) if (Number.isFinite(n.y)) top = Math.min(top, n.y - 36);
+        const bottom = $('dial-dots').getBoundingClientRect().bottom + 6;
+        return y >= top && y <= bottom;
+      }
+      hero.addEventListener('touchstart', e => {
+        touch = null;
+        if (e.touches.length !== 1) return;
+        const t = e.touches[0];
+        if (!inZone(t.clientX, t.clientY) || e.target.closest?.('.hero-actions, .dial-step')) return;
+        touch = { id: t.identifier, x0: t.clientX, y0: t.clientY, axis: '', used: 0, steps: 0, track: [[e.timeStamp, t.clientX]] };
+      }, { passive: true });
+      hero.addEventListener('touchmove', e => {
+        if (!touch) return;
+        if (e.touches.length !== 1) { touch = null; drag(0); return; }
+        const t = [...e.changedTouches].find(p => p.identifier === touch.id);
+        if (!t) return;
+        const dx = t.clientX - touch.x0, dy = t.clientY - touch.y0;
+        if (!touch.axis) {
+          if (Math.hypot(dx, dy) < 10) return;
+          touch.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+          if (touch.axis === 'y') { touch = null; return; }   // the page scrolls
+          touch.used = Math.sign(dx) * 10;                   // (the slop is not travel)
+        }
+        touch.track.push([e.timeStamp, t.clientX]);
+        if (touch.track.length > 8) touch.track.shift();
+        const step = stepPx();
+        let rest = dx - touch.used;
+        while (Math.abs(rest) >= step) {
+          const s = Math.sign(rest);
+          setDial(dialN - s);
+          touch.used += s * step;
+          touch.steps++;
+          swiped = performance.now();
+          rest = dx - touch.used;
+        }
+        if (!isCalm()) drag(clamp(rest * 0.32, -26, 26));
+      }, { passive: true });
+      const end = e => {
+        if (!touch) return;
+        const t = [...e.changedTouches].find(p => p.identifier === touch.id);
+        const was = touch;
+        touch = null;
+        drag(0);
+        if (!t || was.axis !== 'x' || e.type === 'touchcancel') return;
+        const dx = t.clientX - was.x0;
+        // Release speed over the last ~100 ms (px/ms).
+        const now = e.timeStamp;
+        const recent = was.track.filter(([time]) => now - time <= 100);
+        const first = recent[0] || was.track[0];
+        const v = (t.clientX - first[1]) / Math.max(16, now - first[0]);
+        if (!was.steps && (Math.abs(dx) >= stepPx() * 0.45 || (Math.abs(dx) >= 24 && Math.abs(v) >= 0.3 && Math.sign(v) === Math.sign(dx)))) {
+          setDial(dialN - Math.sign(dx));
+        }
+        swiped = performance.now();
+      };
+      hero.addEventListener('touchend', end, { passive: true });
+      hero.addEventListener('touchcancel', end, { passive: true });
+      // A swipe that began on a node or a dot does not also press it.
+      hero.addEventListener('click', e => {
+        if (performance.now() - swiped < 400 && e.target.closest?.('.node, .dial-dot')) { e.preventDefault(); e.stopPropagation(); }
+      }, true);
     }
 
     /* Explore mode: the ring centred and interactive; Esc returns to the cover. Everything else on
@@ -1592,6 +1925,8 @@
       else if (next === 'footer') { veil(tall ? 0.5 : 0.6); }
       // (The home sections keep their formations: nothing is scattered here.)
       scatter(0);
+      // Phones: the dial's node is held at the front on the cover only.
+      syncFocus();
     }
 
     function observeHero() {
@@ -1614,6 +1949,8 @@
       const pos = state.position;
       const button = $('resume');
       button.hidden = !pos;
+      // (Phones: 이어서 읽기 takes the place of 읽기 시작 beside the dial's 이 장 읽기.)
+      hero.querySelector('.hero-actions').classList.toggle('has-resume', !!pos);
       geometryStale = true;
       if (!pos) { fitActions(); return; }
       const c = chapterOf(pos.chapter);
@@ -1642,8 +1979,13 @@
       $('reader-view').hidden = true;
       document.title = '가능성의 끝 — The End of Possibility';
       measureFooter();
+      // The dial opens on the chapter of the saved place (or 01).
+      dialN = state.position?.chapter || 1;
+      dialSent = -1;
+      sky.dial(dialOn ? dialN : null);
       renderResume();
       updateProgressViews();
+      renderDial();
       document.dispatchEvent(new Event('novel:home'));   // audio: cover balance
       playIntro(hero.querySelector('.hero-copy'));
       // (The section the page was left in no longer applies: the cover's words must not fade in
@@ -1705,6 +2047,9 @@
       for (const el of $$('.section-head, .toc-row')) el.setAttribute('data-reveal', '');
       $$('.toc-row').forEach((row, i) => row.style.setProperty('--row', String(i % 3)));
       buildNodes();
+      buildDial();
+      updateMode(true);
+      renderDial();
       buildLitany();
       bindExplore();
       bindReadout();
@@ -1718,12 +2063,21 @@
 
     return {
       init, enter, onScroll, setSection, placeNodes, placeFallbackNodes, select, renderResume,
-      exitExplore, enterExplore, skipTarget, scrollToTarget, focusTarget,
-      /** The page is leaving the cover: no node stays pointed at or focused. */
-      unlight() { pointed = 0; keyed = 0; },
+      exitExplore, enterExplore, skipTarget, scrollToTarget, focusTarget, coverLayout, updateMode,
+      /** The page is leaving the cover: no node stays pointed at or focused, and the dial lets the
+       * ring go. */
+      unlight() {
+        pointed = 0; keyed = 0;
+        if (dialSent > 0) { dialSent = 0; universe.focusNode(0); }
+      },
+      /** A new universe (mounted, or its context restored): tell it the dial's node again. */
+      refocus() { dialSent = -1; syncFocus(); },
+      /** Progress changed (another tab): the dial's chapter line. */
+      renderDial() { renderDial(); },
       /** Resize, fonts or copy changed: measure the label boxes and obstacles again. */
       invalidate() {
         geometryStale = true;
+        dialHeights = null;
         fitSheet();
         if (body.dataset.view !== 'home') return;
         fitActions();
@@ -1737,6 +2091,8 @@
       get exploring() { return exploring; },
       get section() { return section; },
       get selected() { return selected; },
+      /** The phone dial: whether it is in use, and the chapter at the front. */
+      get dial() { return { on: dialOn, chapter: dialN, held: Math.max(0, dialSent) }; },
     };
   })();
 
@@ -2966,7 +3322,7 @@
       // The stars flow straight into the state the next page opens on: gathered into the formation
       // of a chapter's cover or of the cover, or scattered for a return into a chapter's text.
       if (route.view === 'reader') { stage('chapter', { chapter: route.chapter, layout: 'chapter' }); scatter(text ? 1 : 0); }
-      else if (route.target === 'home') { stage('cover', { layout: 'hero' }); scatter(0); }
+      else if (route.target === 'home') { stage('cover', { layout: home.coverLayout() }); scatter(0); }
       veil(0);
       const animate = !isReduced() && !root.classList.contains('is-booting');
       if (animate) {
@@ -3189,6 +3545,7 @@
     document.addEventListener('universe:ready', e => {
       if (e.detail?.renderer === 'none') root.dataset.universe = 'none';
       home.placeFallbackNodes();
+      home.refocus();
     });
     // Context lost: the fallback sky takes over (its seed sits where the stylesheet puts the star).
     // Explore mode needs the live ring (its button is hidden meanwhile), and an open ending film
@@ -3203,13 +3560,17 @@
     document.addEventListener('universe:contextrestored', () => {
       root.classList.remove('universe-lost');
       universe.invalidate();
+      home.refocus();
       ending.contextRestored();
       scrollEngine.update(true);
     });
     applyMotion();
     reducedQuery.addEventListener?.('change', () => { applyMotion(); });
     // Portrait ↔ landscape: an open chapter card re-composes the cover for the new shape.
-    tallQuery.addEventListener?.('change', () => { if (home.selected) home.select(home.selected); });
+    tallQuery.addEventListener?.('change', () => { home.updateMode(); if (home.selected) home.select(home.selected); });
+    // Phones (a coarse pointer, portrait) use the chapter dial; a pointer attached or a turn of the
+    // device brings back the wide cover.
+    dialQuery.addEventListener?.('change', () => home.updateMode());
 
     home.init();
     reader.bind();
@@ -3236,7 +3597,7 @@
       if (changed.includes('sound')) applySyncedSound();
       updateProgressViews();
       reader.updateBookmark();
-      if (body.dataset.view === 'home') home.renderResume();
+      if (body.dataset.view === 'home') { home.renderResume(); home.renderDial(); }
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden || !soundOnLater) return;
@@ -3263,6 +3624,8 @@
       route: () => ({ view: body.dataset.view, chapter: reader.chapter, phase: body.dataset.phase || null }),
       /** The scatter the page asks of the universe now (0 formation … 1 starfield; the engine eases toward it). */
       scatter: () => scatterTarget,
+      /** The phone cover's chapter dial: {on, chapter, held} (held: the node the universe was asked to hold at the front; 0 released). */
+      dial: () => home.dial,
     };
   }
 

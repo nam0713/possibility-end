@@ -51,7 +51,16 @@
    <p class="hero-kicker"><span>SF 소설</span><span class="mono">01—08</span></p>
    <h1 class="hero-title" id="cover-title" tabindex="-1"><span class="ht-line"><span>가능성의</span></span> <span class="ht-line"><span>끝</span></span></h1>
    <p class="hero-en mono" lang="en">The End of Possibility</p>
+   <!-- Phones (coarse pointer, portrait): the chapter dial under the ring (app.js home dial). -->
+   <div class="dial" id="dial" role="group" aria-label="장 고르기">
+    <button class="dial-step sr-only" id="dial-prev" type="button">이전 장</button>
+    <p class="dial-now" id="dial-now" aria-hidden="true"><span class="dial-head"><span class="dial-num mono" id="dial-num">01</span><span class="dial-kicker" id="dial-kicker"></span><span class="dial-meta" id="dial-meta"></span></span><span class="dial-title" id="dial-title"></span></p>
+    <p class="sr-only" id="dial-live" aria-live="polite" aria-atomic="true"></p>
+    <button class="dial-step sr-only" id="dial-next" type="button">다음 장</button>
+    <div class="dial-dots" id="dial-dots"></div>
+   </div>
    <div class="hero-actions">
+    <a class="btn-primary dial-read" href="#chapter-1" id="dial-read">이 장 읽기</a>
     <a class="btn-primary" href="#chapter-1" id="start-reading">읽기 시작</a>
     <button class="btn-text btn-resume" id="resume" hidden></button>
     <button class="btn-text" id="explore-open" aria-pressed="false">우주 탐색</button>

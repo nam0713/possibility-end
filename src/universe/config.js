@@ -134,7 +134,7 @@ export const MORPH = {
 };
 
 /** Camera easing (critically damped smooth time, seconds). */
-export const EASE = { camera: 0.62, cameraReduced: 0.06, parallax: 0.9, veil: 0.35, reading: 0.45, presence: 0.5, scatter: 0.42, scatterReduced: 0.2, arm: 0.32 };
+export const EASE = { camera: 0.62, cameraReduced: 0.06, parallax: 0.9, veil: 0.35, reading: 0.45, presence: 0.5, scatter: 0.42, scatterReduced: 0.2, arm: 0.32, focus: 0.27 };
 
 export const POST = {
   bloomStrength: 0.55,

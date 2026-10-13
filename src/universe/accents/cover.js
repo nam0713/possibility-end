@@ -13,10 +13,13 @@ import { timeChunk } from '../particles/shaders.js';
 export const NODE_COUNT = 8;
 export const NODE_RADIUS = 0.042;
 
-/** World position of chapter node i (0-based) at living time `time`. */
-export function nodePosition(i, time, out) {
+/**
+ * World position of chapter node i (0-based) for orbit spin `spin` (rad). Free rotation:
+ * spin = living time × RING.nodeOrbit.speed (+ an offset); focusNode turns it (see focus.js).
+ */
+export function nodePosition(i, spin, out) {
   const o = RING.nodeOrbit;
-  const a = (i / NODE_COUNT) * TAU + o.phase + time * o.speed;
+  const a = (i / NODE_COUNT) * TAU + o.phase + spin;
   return transform(o.matrix, Math.cos(a) * o.radius, 0, -Math.sin(a) * o.radius, out);
 }
 
@@ -115,15 +118,15 @@ export class CoverAccent {
 
     this.glow = createGlow({ core: C.core, halo: C.sun, scale: 0.3, intensity: 0.6, flicker: 0.06, breath: 0.06 });
     this.group.add(this.glow);
-    this.time = -1;
+    this.spin = NaN;
   }
 
   update(ctx) {
-    if (ctx.time !== this.time) {
-      this.time = ctx.time;
+    if (ctx.nodeSpin !== this.spin) {
+      this.spin = ctx.nodeSpin;
       const p = scratch;
       for (let i = 0; i < NODE_COUNT; i++) {
-        nodePosition(i, ctx.time, p);
+        nodePosition(i, ctx.nodeSpin, p);
         this.positions[i * 3] = p[0];
         this.positions[i * 3 + 1] = p[1];
         this.positions[i * 3 + 2] = p[2];

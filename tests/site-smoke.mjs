@@ -19,7 +19,10 @@
 // getState().scatter), palette (v9.1: no warm hue in the key UI elements or the UI sources; ch.8's
 // end has exactly one light — the trigger draws none, covers the seed and arms it on hover/focus),
 // ending (legacy #ending, film open → advancing → close restores scroll and focus, keyboard),
-// layout-1440 / layout-390 / layout-320 (no horizontal overflow and no text cut off at the edges:
+// mobile-dial (v9.1 amendment 3: the phone cover's chapter dial under real touch swipes — a horizontal swipe
+// turns one chapter and Universe.focusNode brings that node to the front, a vertical one scrolls; dots, nodes,
+// keys, 이 장 읽기 with and without a saved place; no overlap at 320×568 / 390×844; the wide cover sideways and on
+// desktop), layout-1440 / layout-390 / layout-320 (no horizontal overflow and no text cut off at the edges:
 // home sections, sheets, chapters, the film and its finale), nowebgl (?nowebgl=1 renders and reads;
 // one CSS seed, the cold CSS film; a browser with no WebGL at all), reduced (prefers-reduced-motion:
 // still universe, static text, four stills). Each group also fails on any console error or uncaught
@@ -692,6 +695,144 @@ const groups = {
     checkErrors(errors, ignored);
     await context.close();
   }])),
+
+  /* Amendment 3: the phone cover's chapter dial, driven with real touch events (CDP
+   * Input.dispatchTouchEvent): a horizontal swipe turns one chapter, a vertical one scrolls the page,
+   * dots and nodes select, 이 장 읽기 opens the dial's chapter; the universe holds that node at the
+   * front (Universe.focusNode) and lets it go off the cover; title, ring, dial and actions never
+   * overlap; a phone held sideways and the desktop keep the wide cover. */
+  async 'mobile-dial'() {
+    const boxesOf = page => page.evaluate(() => {
+      const box = el => { if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+      const nodes = [...document.querySelectorAll('.node:not(.is-hidden)')].map(b => ({ n: Number(b.dataset.chapter), y: new DOMMatrix(getComputedStyle(b).transform).m42 }));
+      const ys = nodes.map(n => n.y);
+      return {
+        title: [...document.querySelectorAll('#cover-title .ht-line > span')].map(box),
+        ring: { t: Math.min(...ys) - 6, b: Math.max(...ys) + 6 },
+        dial: [box(document.getElementById('dial-now')), box(document.getElementById('dial-dots'))],
+        actions: [...document.querySelectorAll('.hero-actions > *')].map(box).filter(Boolean),
+        lowest: nodes.sort((a, b) => b.y - a.y)[0]?.n || 0,
+        targets: [...document.querySelectorAll('.dial-dot, .hero-actions > *')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().height)),
+      };
+    });
+    const vertical = (a, b) => a && b && a.t < b.b && b.t < a.b;
+    const dialOf = page => page.evaluate(() => ({ ...NovelUI.dial(), focused: Universe.getState().focusedNode ?? null, engineDial: typeof Universe.focusNode === 'function', y: Math.round(scrollY), route: NovelUI.route(), hash: location.hash }));
+
+    for (const [width, height] of [[320, 568], [390, 844]]) {
+      const { context, page, errors, ignored } = await openPage({ width, height, mobile: true, dpr: 2 });
+      const tag = `${width}×${height}`;
+      await load(page, urlFor('#home'));
+      let d = await dialOf(page);
+      check(`${tag}: the cover is the chapter dial, on 01, held at the front`, d.on && d.chapter === 1 && d.held === 1 && (!d.engineDial || d.focused === 1), d);
+      const ui = await page.evaluate(() => ({ explore: document.getElementById('explore-open').getClientRects().length, read: document.getElementById('dial-read').getClientRects().length, en: document.querySelector('.hero-en').getClientRects().length }));
+      check(`${tag}: 이 장 읽기 shown, 우주 탐색 hidden`, ui.read === 1 && ui.explore === 0, ui);
+      const b = await boxesOf(page);
+      const parts = [...b.title.map(t => ['title', t]), ['ring', b.ring], ['dial', b.dial[0]], ['dots', b.dial[1]], ...b.actions.map(a => ['action', a])];
+      const clashes = [];
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) {
+        const [na, a] = parts[i], [nb, bb] = parts[j];
+        if (na === nb || (na === 'title' && nb === 'title') || (na === 'action' && nb === 'action')) continue;
+        if (vertical(a, bb)) clashes.push(`${na}×${nb}`);
+      }
+      check(`${tag}: title, ring, dial and actions do not overlap`, clashes.length === 0, { clashes, ...b });
+      check(`${tag}: dots and actions are ≥ 40 px tall touch targets`, b.targets.every(h => h >= 40), b.targets);
+      if (d.engineDial) check(`${tag}: the dial's node is the ring's front (lowest) node`, b.lowest === 1, b);
+      await checkOverflow(page, `${tag} dial cover`);
+
+      if (width === 390) {
+        const cdp = await context.newCDPSession(page);
+        const swipe = async (x0, y0, x1, y1, ms = 240, n = 8) => {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0, id: 1 }] });
+          for (let i = 1; i <= n; i++) {
+            await page.waitForTimeout(ms / n);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 + (x1 - x0) * i / n, y: y0 + (y1 - y0) * i / n, id: 1 }] });
+          }
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await page.waitForTimeout(400);
+        };
+        const tap = async selector => {
+          const [x, y] = await page.evaluate(sel => { const r = document.querySelector(sel).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, selector);
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 2 }] });
+          await page.waitForTimeout(50);
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await page.waitForTimeout(400);
+        };
+        const zone = b.dial[0].t - 50;   // over the ring's lower half
+        await swipe(290, zone, 110, zone + 8);
+        d = await dialOf(page);
+        check('swipe left (180 px): one chapter on (02)', d.chapter === 2 && d.y === 0, d);
+        await page.waitForTimeout(1400);
+        d = await dialOf(page);
+        const front = (await boxesOf(page)).lowest;
+        check('…the universe turns node 02 to the front', !d.engineDial || (d.focused === 2 && front === 2), { ...d, front });
+        await swipe(120, zone, 200, zone - 4, 120, 4);
+        d = await dialOf(page);
+        check('quick flick right (80 px): one chapter back (01)', d.chapter === 1, d);
+        await swipe(372, zone, 18, zone, 800, 18);
+        d = await dialOf(page);
+        check('long slow swipe left (354 px): several chapters (03)', d.chapter === 3, d);
+        await swipe(200, zone + 30, 206, zone - 260, 320, 10);
+        await page.waitForTimeout(800);
+        d = await dialOf(page);
+        check('vertical swipe: the page scrolls, the dial stays', d.y > 100 && d.chapter === 3, d);
+        const faded = await page.evaluate(() => getComputedStyle(document.querySelector('#dial .dial-now')).opacity);
+        check('…and the dial has faded clear of the ring', Number(faded) < 0.05, faded);
+        await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+        await page.waitForTimeout(SCROLL_SETTLE);
+        await tap('.dial-dot[data-chapter="6"]');
+        d = await dialOf(page);
+        check('tapping dot 06 selects 06', d.chapter === 6, d);
+        await page.waitForTimeout(1400);
+        const node = await page.evaluate(() => [...document.querySelectorAll('.node')].find(n => !n.classList.contains('is-hidden') && !n.classList.contains('is-occluded') && !n.classList.contains('is-sunk') && n.dataset.chapter !== '6')?.dataset.chapter);
+        await tap(`.node[data-chapter="${node}"]`);
+        d = await dialOf(page);
+        const card = await page.evaluate(() => !document.getElementById('readout').hidden);
+        check(`tapping node ${node} selects it in the dial (no card)`, d.chapter === Number(node) && !card, { ...d, card });
+        await page.focus('.dial-dot[aria-current="true"]');
+        await page.keyboard.press('ArrowRight');
+        d = await dialOf(page);
+        const live = await page.evaluate(() => document.getElementById('dial-live').textContent);
+        check('arrow key on the dots turns the dial and announces it', d.chapter === Number(node) % 8 + 1 && live.startsWith(String(d.chapter).padStart(2, '0')), { ...d, live });
+        await page.evaluate(() => document.getElementById('contents').scrollIntoView({ block: 'start', behavior: 'instant' }));
+        await page.waitForTimeout(SCROLL_SETTLE);
+        d = await dialOf(page);
+        check('scrolled to the contents: the ring is let go (focusNode(0))', d.held === 0 && (!d.engineDial || d.focused === 0), d);
+        await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+        await page.waitForTimeout(SCROLL_SETTLE);
+        d = await dialOf(page);
+        check('back on the cover: held at the front again', d.held === d.chapter && (!d.engineDial || d.focused === d.chapter), d);
+        const want = d.chapter;
+        await tap('#dial-read');
+        await page.waitForTimeout(SETTLE);
+        d = await dialOf(page);
+        check(`이 장 읽기 opens chapter ${want}`, d.hash === `#chapter-${want}` && d.route.view === 'reader' && d.route.chapter === want && (!d.engineDial || d.focused === 0), d);
+        // A saved place: the dial opens on its chapter, 이어서 읽기 replaces 읽기 시작, 이 장 읽기 resumes.
+        await page.evaluate(() => { const el = document.getElementById('p-5'); scrollTo({ top: el.getBoundingClientRect().top + scrollY - 72, behavior: 'instant' }); });
+        await page.waitForTimeout(SCROLL_SETTLE);
+        const saved = (await page.evaluate(() => NovelUI.state())).position;
+        await go(page, '#home');
+        d = await dialOf(page);
+        const actions = await page.evaluate(() => ({ start: document.getElementById('start-reading').getClientRects().length, resume: !document.getElementById('resume').hidden }));
+        check('a saved place: the dial opens on its chapter, 이어서 읽기 instead of 읽기 시작', d.chapter === saved?.chapter && actions.resume && actions.start === 0, { saved, ...d, ...actions });
+        await tap('#dial-read');
+        await page.waitForTimeout(SETTLE);
+        const line = await paragraphOnLine(page);
+        check('…and 이 장 읽기 returns to that place', (await dialOf(page)).route.chapter === saved?.chapter && line === saved?.paragraph, { line, saved });
+      }
+      checkErrors(errors, ignored);
+      await context.close();
+    }
+
+    // A phone held sideways, and the desktop: the wide cover as it was.
+    for (const [width, height, mobile] of [[844, 390, true], [1440, 900, false]]) {
+      const { context, page, errors, ignored } = await openPage({ width, height, mobile });
+      await load(page, urlFor('#home'));
+      const s = await page.evaluate(() => ({ dial: NovelUI.dial(), explore: document.getElementById('explore-open').getClientRects().length, dialShown: document.getElementById('dial').getClientRects().length, en: document.querySelector('.hero-en').getClientRects().length, start: getComputedStyle(document.getElementById('start-reading')).backgroundColor }));
+      check(`${width}×${height}${mobile ? ' (touch)' : ''}: the wide cover — no dial, 우주 탐색, the filled 읽기 시작`, !s.dial.on && !s.dialShown && s.explore === 1 && s.en === 1 && s.start !== 'rgba(0, 0, 0, 0)', s);
+      checkErrors(errors, ignored, ` ${width}×${height}`);
+      await context.close();
+    }
+  },
 
   async nowebgl() {
     const { context, page, errors, ignored } = await openPage();

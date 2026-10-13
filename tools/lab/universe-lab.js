@@ -3,7 +3,7 @@
 //
 // URL flags: ?scene=cover|preview|chapter|ending-ready &chapter=1..8 &layout=hero|explore|contents|chapter|reading
 //            &quality=auto|high|medium|low &adaptive=0 &settle=1 &reading=0..1 &veil=0..1 &scatter=0..1 &arm=1 &paused=1
-//            &time=<s> (freeze living time) &select=n &ui=0 (hide panel) &nodes=0 (hides the node and
+//            &time=<s> (freeze living time) &select=n &focus=n (cover dial: focusNode) &ui=0 (hide panel) &nodes=0 (hides the node and
 //            anchor overlay) &guides=1 &nowebgl=1
 (() => {
   'use strict';
@@ -42,6 +42,10 @@
     opt.value = n;
     opt.textContent = `select: ${n}`;
     $('select-node').append(opt);
+    const fo = document.createElement('option');
+    fo.value = n;
+    fo.textContent = `focus: ${n}`;
+    $('focus-node').append(fo);
   }
   // The formation's anchor (its focal point: where the UI puts the ch.8 trigger star).
   const anchorMark = document.createElement('div');
@@ -139,6 +143,19 @@
   $('quality').value = quality;
   $('quality').addEventListener('change', (e) => U.setQuality(e.target.value));
   $('select-node').addEventListener('change', (e) => U.select(Number(e.target.value)));
+  // Cover chapter dial: focusNode(n) turns node n to the front of its orbit (0 releases).
+  function focus(n) {
+    const ok = U.focusNode(n);
+    const s = U.getState();
+    $('focus-node').value = String(s.focusedNode || 0);
+    $('select-node').value = String(s.selected || 0);
+    log(`focusNode(${n}) → ${ok}`);
+    return ok;
+  }
+  $('focus-node').addEventListener('change', (e) => focus(Number(e.target.value)));
+  const stepFocus = (d) => focus((((U.getState().focusedNode || (d > 0 ? 0 : 1)) - 1 + d + 8) % 8) + 1);
+  $('focus-prev').addEventListener('click', () => stepFocus(-1));
+  $('focus-next').addEventListener('click', () => stepFocus(1));
   $('zoom-in').addEventListener('click', () => U.zoom(1.12));
   $('zoom-out').addEventListener('click', () => U.zoom(1 / 1.12));
   $('reset').addEventListener('click', () => U.reset());
@@ -194,7 +211,7 @@
   function tick() {
     const s = U.getState();
     const a = lastFrame && lastFrame.anchor;
-    $('status').textContent = `${s.renderer} · ${s.scene || '-'}${s.chapter ? ' ' + s.chapter : ''} · ${s.layout || '-'} · ${s.quality} · ${s.particles} · ${s.fps} fps · scatter ${(s.scatter || 0).toFixed(2)}${a ? ` · anchor ${Math.round(a.x)},${Math.round(a.y)}${a.visible ? '' : ' (hidden)'}` : ''}`;
+    $('status').textContent = `${s.renderer} · ${s.scene || '-'}${s.chapter ? ' ' + s.chapter : ''} · ${s.layout || '-'} · ${s.quality} · ${s.particles} · ${s.fps} fps · scatter ${(s.scatter || 0).toFixed(2)}${s.focusedNode ? ` · focus ${s.focusedNode}${s.focusMoving ? '…' : ''}` : ''}${a ? ` · anchor ${Math.round(a.x)},${Math.round(a.y)}${a.visible ? '' : ' (hidden)'}` : ''}`;
     $('state').textContent = JSON.stringify({ ...s, ending: { ...s.ending, phases: undefined } }, null, 1);
     const eng = U._debug.engine;
     if (eng && guides.classList.contains('on')) {
@@ -237,6 +254,7 @@
     U.ending.arm(true);
   }
   if (flag('select')) U.select(Number(flag('select')));
+  if (flag('focus')) focus(Number(flag('focus')));
   if (flag('time')) {
     U._debug.setTime(Number(flag('time')));
     U._debug.freeze(true);
@@ -267,6 +285,14 @@
       scatter.apply();
       if (settle) U._debug.settle();
       return U.getState().scatter;
+    },
+    /** Cover dial: focusNode(n) (0 releases); returns whether it applied. */
+    focus: (n) => focus(n),
+    /** The node the subscription shows lowest on screen (largest y among visible nodes). */
+    front() {
+      let best = null;
+      for (const node of lastFrame ? lastFrame.nodes : []) if (node.visible && (!best || node.y > best.y)) best = node;
+      return best ? { n: best.n, x: best.x, y: best.y } : null;
     },
     nodes: () => lastFrame,
     anchor: () => (lastFrame ? { ...lastFrame.anchor } : null),

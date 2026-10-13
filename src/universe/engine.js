@@ -25,6 +25,7 @@ import { AccentManager } from './accents/index.js';
 import { PostChain } from './post.js';
 import { CameraRig } from './camera.js';
 import { NodeTracker } from './nodes.js';
+import { NodeFocus } from './focus.js';
 import { InputController } from './input.js';
 import { AdaptiveQuality, GpuTimer, detectTier, normalizeTier } from './quality.js';
 import { FilmHost } from './film-host.js';
@@ -94,7 +95,9 @@ export class Engine {
     this.arm = damper(0);
     this.armMoving = false;
     this.dimEff = 1; // the light's dim as drawn: the composition's, released by the scatter
-    this.ctx = { presence: 0, time: 0, gpuTime: 0, dtLiving: 0, clock: 0, reading: 0, focus: 10, spread: 0, expand: 1, evolve: 1, pixelScale: 1000, pixelRatio: 1, selected: 0, morph: 1, solid: 1, arm: 0 };
+    // Cover chapter dial (focusNode): turns the node orbit so a node comes to the front.
+    this.nodeFocus = new NodeFocus();
+    this.ctx = { presence: 0, time: 0, gpuTime: 0, dtLiving: 0, clock: 0, reading: 0, focus: 10, spread: 0, expand: 1, evolve: 1, pixelScale: 1000, pixelRatio: 1, selected: 0, morph: 1, solid: 1, arm: 0, nodeSpin: 0 };
     this.reducedMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false, addEventListener() {} };
     this.coarseMQ = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)') : { matches: false };
   }
@@ -493,6 +496,8 @@ export class Engine {
     if (name === 'chapter' && (prevScene !== 'chapter' || chapter !== this.chapter)) this.readingRaw = 0;
     this.sceneName = name;
     this.chapter = chapter;
+    // Leaving the cover releases the chapter dial (and the highlight it set).
+    if (name !== 'cover' && this.nodeFocus.node) this.focusNode(0);
     const fid = formationId(name, chapter);
     const target = this.pending ? this.pending.fid : this.formationId;
     if (fid !== target) {
@@ -716,6 +721,26 @@ export class Engine {
   select(n) {
     this.selected = clamp(Math.round(Number(n) || 0), 0, 8);
     this.request();
+  }
+
+  /**
+   * Cover chapter dial: turn the node orbit so node n (1..8) comes to the front (the orbit's lowest
+   * point on screen) and highlight it (as select(n)); 0 releases to free rotation and clears the
+   * highlight it set (unless select() changed it since). No-op off the cover. Returns whether the
+   * call applied.
+   */
+  focusNode(n) {
+    const k = clamp(Math.round(Number(n) || 0), 0, 8);
+    if (k && this.sceneName !== 'cover') return false;
+    const prev = this.nodeFocus.node;
+    if (!k && !prev) return this.sceneName === 'cover';
+    // Instant under reduced motion, and while the nodes are not on screen yet (nothing to watch turn).
+    const instant = this.reducedMotion() || this.accents.presence('cover') < 0.05;
+    this.nodeFocus.set(k, instant, this.time);
+    if (k) this.selected = k;
+    else if (this.selected === prev) this.selected = 0;
+    this.request();
+    return true;
   }
 
   // ------------------------------------------------------------------ ending
@@ -1109,7 +1134,7 @@ export class Engine {
     }
     const holdFrame = this.holdFrame;
     this.holdFrame = false;
-    const ambientOnly = this.ambient() && !this.field.morphing && !this.rig.moving && !this.input.dragging && !this.fading && !this.scatterMoving && !this.armMoving;
+    const ambientOnly = this.ambient() && !this.field.morphing && !this.rig.moving && !this.input.dragging && !this.fading && !this.scatterMoving && !this.armMoving && !this.nodeFocus.moving;
     // During a touch scroll the universe keeps moving at 30 fps (the compositor owns the scroll).
     const holdCap = this.holding && !this.input.dragging ? 1000 / 30 : 0;
     // The steady reading starfield (fully scattered) drifts ≤ 4 px/s: 30 fps is plenty there too.
@@ -1143,7 +1168,7 @@ export class Engine {
     this.countFrame(now);
     // Subscribers (the UI's node buttons) run after the timed work.
     this.nodes.flush();
-    if (holdFrame && this.holding && !this.scatterActive()) {
+    if (holdFrame && this.holding && !this.scatterActive() && !this.nodeFocus.moving) {
       this.lastHoldFrame = performance.now();
       this.lastDraw = 0;
       return;
@@ -1182,6 +1207,8 @@ export class Engine {
     this.armMoving = this.arm.value !== this.armTarget;
     this.rig.calm = S;
     const camMoving = this.rig.update(dt, this.time, reduced, this.parallaxEnabled());
+    // The cover's node orbit (free, or turning a node to the front: focusNode).
+    const nodeSpin = this.nodeFocus.update(dt, this.time, this.rig, reduced);
 
     // Reading progress eases (it follows scroll).
     const rt = this.readingValue();
@@ -1206,6 +1233,7 @@ export class Engine {
     ctx.clock = this.clock;
     ctx.focus = this.rig.distance;
     ctx.selected = this.selected;
+    ctx.nodeSpin = nodeSpin;
     ctx.morph = this.field.uniforms.uMorph.value;
     // Accents are the formation's structure: they leave with its matter (gone before the stars settle;
     // under reduced motion on the formation's own cross-fade curve).
@@ -1273,7 +1301,7 @@ export class Engine {
     const focus = this.rig.focusPoint(this.focusScratch);
     this.nodes.update(this.rig, cover ? cover.positions : null, cover ? this.accents.presence('cover') : 0, this.sceneName, this.selected, focus, this.formationId !== 'origin');
 
-    return animate || morphing || camMoving || readingMoving || this.fading || this.input.dragging || this.scatterMoving || this.armMoving;
+    return animate || morphing || camMoving || readingMoving || this.fading || this.input.dragging || this.scatterMoving || this.armMoving || this.nodeFocus.moving;
   }
 
   render(dt) {
@@ -1304,6 +1332,8 @@ export class Engine {
       morph: Math.round(this.field.uniforms.uMorph.value * 1000) / 1000,
       reducedMotion: this.reducedMotion(),
       selected: this.selected,
+      focusedNode: this.nodeFocus.node,
+      focusMoving: this.nodeFocus.moving,
       pixelRatio: this.pixelRatio,
       adaptiveLevel: this.adaptive.level,
       adaptive: this.adaptive.info(),
@@ -1348,6 +1378,7 @@ export class Engine {
     this.scatter.velocity = 0;
     this.arm.value = this.armTarget;
     this.arm.velocity = 0;
+    this.nodeFocus.settle();
     this.rig.snap();
     this.request();
   }

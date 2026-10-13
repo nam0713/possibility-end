@@ -330,6 +330,8 @@ body[data-view="reader"].in-text .rail { opacity: 1; visibility: visible; pointe
 body[data-section]:not([data-section="hero"]) :is(.hero-kicker, .hero-title, .hero-en),
 body[data-section]:not([data-section="hero"]) .hero-actions:not(:focus-within) { opacity: 0; }
 body[data-section]:not([data-section="hero"]) .hero-actions:not(:focus-within) > * { pointer-events: none; }
+body[data-section]:not([data-section="hero"]) .dial:not(:focus-within) { opacity: 0; }
+body[data-section]:not([data-section="hero"]) .dial:not(:focus-within) > * { pointer-events: none; }
 html[data-universe="none"] #explore-open, html.universe-lost #explore-open { display: none; }
 
 .scroll-cue { position: absolute; left: 50%; bottom: calc(14px + var(--safe-b)); width: 44px; height: 60px; margin-left: -22px; z-index: 2; }
@@ -438,6 +440,65 @@ html.exploring .hero-copy { opacity: 0; visibility: hidden; transform: translate
 .explore-tools .btn-text { font-size: 14px; }
 .explore-exit { color: var(--fg); }
 html.exploring .readout { bottom: calc(118px + var(--safe-b)); }
+
+/* The chapter dial: phones only (a coarse pointer and the portrait test; app.js sets html.has-dial,
+   design/V9.1-FEEDBACK.md amendment 3). The ring is centred higher (the 'explore' composition) and
+   turns one chapter per horizontal swipe; under it, the chapter at the front in large type and eight
+   position dots; at the bottom, 이 장 읽기 beside the cover's own 읽기 시작 / 이어서 읽기. Vertical
+   swipes stay the page's scroll (pan-y; pinch-zoom is kept). No explore mode and no card here. */
+.dial, .dial-read { display: none; }
+html.has-dial .dial { display: block; }
+html.has-dial .dial-read { display: inline-flex; }
+html.has-dial #explore-open, html.has-dial .hero-en { display: none; }
+html.has-dial .hero { touch-action: pan-y pinch-zoom; }
+/* (A tablet held upright: the title keeps clear of the larger centred ring.) */
+html.has-dial .hero-title { font-size: clamp(54px, min(19vw, 9vh), 136px); }
+.dial {
+  /* (app.js places it just under the ring's lowest point: --dial-top, in the cover's coordinates.) */
+  position: absolute; z-index: 5; left: var(--pad-l); right: var(--pad-r);
+  top: var(--dial-top, calc(46svh + min(32vw, 21svh) + 30px));
+  pointer-events: none;
+  transition: top .5s var(--ease), opacity .6s var(--ease-io), visibility 0s;
+}
+.dial > * { opacity: var(--fade, 1); }
+.dial-dots, .dial-step { pointer-events: auto; }
+.dial.is-faded:not(:focus-within) > * { pointer-events: none; }
+.dial:focus-within > * { opacity: 1; }
+.dial-now { display: block; }
+.dial-head { display: flex; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--fg-2); white-space: nowrap; }
+.dial-num { font-size: 12px; color: var(--accent); }
+.dial-meta { color: var(--fg-3); }
+.dial-title {
+  display: block; margin-top: 4px;
+  font-size: clamp(36px, 11vw, 50px); font-weight: 800; line-height: 1.08; letter-spacing: -.05em; white-space: nowrap;
+}
+.dial-title.is-long { font-size: clamp(29px, 8.6vw, 40px); }
+/* Eight positions; the current one is a short bar in the theme colour. Each is a full-height
+   target, as wide as the row allows (44 px, or an eighth of a narrow screen); the first dot lines
+   up with the text above. */
+.dial-dots { --dot-w: min(44px, calc((100vw - var(--pad-l) - var(--pad-r)) / 8)); display: flex; margin: 6px 0 0 calc((var(--dot-w) - 6px) / -2); }
+.dial-dot { position: relative; display: grid; place-items: center; width: var(--dot-w); height: 44px; }
+.dial-dot i { width: 6px; height: 6px; border-radius: 3px; background: var(--fg-3); opacity: .6; transition: width .45s var(--ease), background-color .3s, opacity .3s; }
+.dial-dot[aria-current="true"] i { width: 18px; background: var(--accent); opacity: 1; }
+.dial-dot:focus-visible { outline-offset: -8px; }
+/* Previous / next: for the keyboard and screen readers (visually hidden, .sr-only); they show at
+   the right of the chapter's name only while keyboard-focused. */
+.dial-step.sr-only:focus-visible {
+  position: absolute !important; right: 0; top: 18px; z-index: 1; display: grid; place-items: center;
+  width: auto !important; height: 44px !important; margin: 0 !important; padding: 0 10px !important;
+  overflow: visible !important; clip: auto !important; clip-path: none !important;
+  font-size: 13px; font-weight: 500; color: var(--fg); background: var(--space);
+}
+/* Short of room between the ring and the actions (app.js): a smaller name, tighter rows. */
+.dial.is-snug .dial-title { margin-top: 2px; font-size: clamp(30px, 9.4vw, 40px); }
+.dial.is-snug .dial-title.is-long { font-size: clamp(26px, 7.6vw, 34px); }
+.dial.is-snug .dial-dots { margin-top: 0; }
+.dial.is-snug .dial-dot { height: 40px; }
+/* Beside the dial's primary 이 장 읽기, the cover's own action is a quiet text button; a saved place
+   takes the place of 읽기 시작 (이어서 읽기 — 04). */
+html.has-dial #start-reading { gap: 6px; min-height: 44px; padding: 0 2px; background: none; color: var(--fg-2); font-weight: 500; }
+html.has-dial #start-reading::before { display: none; }
+html.has-dial .hero-actions.has-resume #start-reading { display: none; }
 
 /* ── 7. Contents ──────────────────────────────────────────────────────── */
 .contents { position: relative; padding: clamp(96px, 16vh, 180px) var(--pad-r) clamp(64px, 10vh, 120px) var(--pad-l); }
@@ -908,6 +969,9 @@ dialog.ending.is-fallback .film { display: block; }
 .motion-ok .intro > :nth-child(3) { animation-delay: .55s; }
 .motion-ok .intro > :nth-child(4) { animation-delay: .68s; }
 .motion-ok .intro > :nth-child(5) { animation-delay: .8s; }
+/* (The phone dial comes in with the actions, which keep their own moment.) */
+.motion-ok .intro > .dial { animation-delay: .6s; }
+.motion-ok .intro > .hero-actions { animation-delay: .68s; }
 .motion-ok .intro .ht-line > span { animation: title-in 1.4s var(--ease) both; }
 .motion-ok .intro .ht-line + .ht-line > span { animation-delay: .12s; }
 .motion-ok .intro .cc-title { animation: rise 1.4s var(--ease) .18s both; }
@@ -1079,6 +1143,13 @@ html.is-leaving main { opacity: 0; }
   .seed-trigger { top: 46%; }
   /* The film's caption spans the width here: the shade does too. */
   dialog.ending::before { height: 40%; background: linear-gradient(180deg, transparent, rgba(4, 7, 11, .5) 42%, rgba(4, 7, 11, .78)); }
+}
+/* Phones with the dial, shorter than ~740 px (375×667, 320×568): the ring is centred higher, so the
+   title takes one line above it. */
+@media (max-height: 739px) {
+  html.has-dial .ht-line { display: inline-block; vertical-align: top; }
+  html.has-dial .hero-title { font-size: clamp(38px, 12.6vw, 60px); }
+  html.has-dial .hero-kicker { margin-bottom: 10px; }
 }
 @media (max-width: 639px) and (max-height: 700px), (max-aspect-ratio: 4/5) and (max-height: 700px) {
   /* Short phones: the next chapter's card stays below its formation. */

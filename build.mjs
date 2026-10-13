@@ -143,7 +143,7 @@ const UNIVERSE_STUB = `/* Universe stub: src/generated/universe.js has not been 
     mount: function () { root.dataset.universe = 'none'; return false; },
     setScene: noop, setLayout: noop, setReading: noop, setVeil: noop, setVisible: noop,
     setScatter: noop, setInteractive: noop, setPointer: noop, setPaused: noop, setQuality: noop,
-    select: noop, reset: noop, zoom: noop,
+    select: noop, focusNode: noop, reset: noop, zoom: noop,
     subscribe: function () { return noop; },
     pick: function () { return 0; },
     getState: function () { return { renderer: 'none', scene: null, chapter: 0, layout: null, quality: 'low', particles: 0, fps: 0, frames: 0, contextLost: false, paused: false, visible: false, interactive: false, scatter: 0, ending: Object.assign({}, ending) }; },

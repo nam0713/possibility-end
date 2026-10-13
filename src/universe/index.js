@@ -25,7 +25,7 @@ let failed = false;
 let loseExt = null;
 const subs = new Set();
 // State requested before mount (or kept for diagnostics when unavailable).
-const pending = { scene: null, layout: null, reading: 0, veil: 0, scatter: 0, armed: false, visible: true, interactive: false, paused: false, pointer: null, selected: 0, quality: null };
+const pending = { scene: null, layout: null, reading: 0, veil: 0, scatter: 0, armed: false, visible: true, interactive: false, paused: false, pointer: null, selected: 0, focused: 0, quality: null };
 
 const html = () => document.documentElement;
 const ready = () => !!(engine && engine.ok);
@@ -74,6 +74,8 @@ function noneState() {
     visible: pending.visible,
     interactive: pending.interactive,
     scatter: 0,
+    selected: pending.selected,
+    focusedNode: 0,
     ending: idleEndingState(),
   };
 }
@@ -120,6 +122,7 @@ function applyPending(e) {
   if (p.pointer) e.pointerMoved(p.pointer[0], p.pointer[1]);
   if (p.scene) e.setScene(p.scene.name, p.scene.opts);
   if (p.layout) e.setLayout(p.layout);
+  if (p.focused) e.focusNode(p.focused);
   if (p.interactive) e.setInteractive(true);
   if (!p.visible) e.setVisible(false);
 }
@@ -155,6 +158,7 @@ const Universe = {
     if (!SCENES.includes(name)) return;
     pending.scene = { name, opts: opts && typeof opts === 'object' ? { ...opts } : {} };
     pending.layout = null;
+    if (name !== 'cover') pending.focused = 0;
     guard((e) => e.pageScene(name, pending.scene.opts));
   },
 
@@ -211,6 +215,35 @@ const Universe = {
   select(n) {
     pending.selected = Number(n) || 0;
     guard((e) => e.select(n));
+  },
+
+  /**
+   * Cover chapter dial (v9.1 amendment 3): turn the node orbit so node n (1..8) comes to the front —
+   * the orbit's lowest point on screen — and highlight it (as select(n)); it holds there, breathing
+   * gently. 0 releases to free rotation (and clears the highlight it set). ≈0.9 s critically damped,
+   * interruptible (successive calls retarget the shortest way round); reduced motion: instant.
+   * No-op off the cover and without WebGL. Returns whether it applied.
+   */
+  focusNode(n) {
+    const v = Math.round(Number(n));
+    const k = Number.isFinite(v) ? Math.min(8, Math.max(0, v)) : 0;
+    const s = pending.scene;
+    if (!ready()) {
+      // Before mount: remembered for the cover (applied with the scene). Without WebGL: a no-op.
+      if (failed || (k && (!s || s.name !== 'cover'))) return false;
+      if (k) pending.selected = k;
+      else if (pending.focused && pending.selected === pending.focused) pending.selected = 0;
+      pending.focused = k;
+      return false;
+    }
+    return guard((e) => {
+      const ok = e.focusNode(k);
+      if (ok) {
+        pending.focused = e.nodeFocus.node;
+        pending.selected = e.selected;
+      }
+      return ok;
+    }, false);
   },
 
   reset() {

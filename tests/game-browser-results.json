@@ -1,0 +1,251 @@
+{
+  "startedAt": "2026-10-10T16:05:00.382Z",
+  "url": "http://localhost:5173/game/?qa=1",
+  "browser": "isolated headless Microsoft Edge",
+  "scope": "Real browser rendering and input. QA setup and accelerated objectives are explicitly labeled; this is not an unassisted full-length balancing playthrough.",
+  "checks": [
+    {
+      "name": "Menu renders a functioning 3D scene",
+      "kind": "actual rendering",
+      "status": "passed",
+      "durationMs": 273,
+      "details": {
+        "renderCalls": 443,
+        "triangles": 32040
+      }
+    },
+    {
+      "name": "WASD movement uses actual keyboard input",
+      "kind": "actual input",
+      "status": "passed",
+      "durationMs": 583,
+      "details": {
+        "before": {
+          "x": 0,
+          "z": 7
+        },
+        "after": {
+          "x": 5.4045,
+          "z": 7
+        },
+        "elapsed": 0.6905000000000002
+      }
+    },
+    {
+      "name": "Held pointer firing kills a spawned enemy and its pickup grants matter",
+      "kind": "actual input with QA enemy/position setup",
+      "status": "passed",
+      "durationMs": 605,
+      "details": {
+        "kills": 1,
+        "matter": 3,
+        "xp": 6,
+        "level": 1
+      }
+    },
+    {
+      "name": "Collected XP opens an upgrade, freezes simulation, and selecting a card changes stats",
+      "kind": "actual input with QA enemy setup",
+      "status": "passed",
+      "durationMs": 4193,
+      "details": {
+        "level": 2,
+        "beforeStats": {
+          "maxHp": 100,
+          "damage": 17,
+          "interval": 0.17,
+          "speed": 9,
+          "dashCooldown": 2.5,
+          "pulseDamage": 65,
+          "pulseRadius": 7,
+          "pulseCooldown": 8,
+          "multi": 1,
+          "chain": 0,
+          "drone": 0,
+          "vamp": 0,
+          "crit": 0.07
+        },
+        "chosenStats": {
+          "maxHp": 100,
+          "damage": 17,
+          "interval": 0.17,
+          "speed": 10.35,
+          "dashCooldown": 2.125,
+          "pulseDamage": 65,
+          "pulseRadius": 7,
+          "pulseCooldown": 8,
+          "multi": 1,
+          "chain": 0,
+          "drone": 0,
+          "vamp": 0,
+          "crit": 0.07
+        }
+      }
+    },
+    {
+      "name": "Escape pauses simulation and the Resume button restores it",
+      "kind": "actual input",
+      "status": "passed",
+      "durationMs": 1111,
+      "details": {
+        "pausedElapsed": 6.28823000000002,
+        "resumedElapsed": 6.6552300000000235
+      }
+    },
+    {
+      "name": "E refuses to activate an unaffordable relay",
+      "kind": "actual input with QA position setup",
+      "status": "passed",
+      "durationMs": 12,
+      "details": {
+        "matter": 0,
+        "activeRelay": null
+      }
+    },
+    {
+      "name": "A relay charges inside its radius and stops outside",
+      "kind": "actual input and time with QA position/resource setup",
+      "status": "passed",
+      "durationMs": 924,
+      "details": {
+        "insideProgress": 0.15019999999999892,
+        "outsideProgress": 0.15019999999999892,
+        "afterWait": 0.15019999999999892
+      }
+    },
+    {
+      "name": "All three relay completions trigger upgrades and spawn the final boss",
+      "kind": "QA accelerated charge; actual E activation and upgrade selection",
+      "status": "passed",
+      "durationMs": 698,
+      "details": {
+        "relaysDone": 3,
+        "bossPresent": true,
+        "mode": "playing"
+      }
+    },
+    {
+      "name": "Defeating the boss unlocks the portal and actual E input completes victory",
+      "kind": "QA boss defeat/position setup; actual final input",
+      "status": "passed",
+      "durationMs": 764,
+      "details": {
+        "state": {
+          "mode": "won",
+          "elapsed": 1.3175999999999992,
+          "hp": 100,
+          "maxHp": 100,
+          "kills": 1,
+          "scrap": 0,
+          "level": 1,
+          "xp": 0,
+          "relaysDone": 3,
+          "player": {
+            "x": 0,
+            "z": 0
+          },
+          "stats": {
+            "maxHp": 100,
+            "damage": 28.730000000000004,
+            "interval": 0.17,
+            "speed": 9,
+            "dashCooldown": 2.5,
+            "pulseDamage": 97.5,
+            "pulseRadius": 8.049999999999999,
+            "pulseCooldown": 7.04,
+            "multi": 1,
+            "chain": 0,
+            "drone": 0,
+            "vamp": 0,
+            "crit": 0.07
+          },
+          "enemies": [],
+          "activeRelay": null,
+          "boss": false,
+          "bossDefeated": true,
+          "bullets": 0,
+          "renderer": {
+            "frame": 760,
+            "calls": 379,
+            "triangles": 30978,
+            "points": 1700,
+            "lines": 240
+          }
+        },
+        "title": "다시, 가능성."
+      }
+    },
+    {
+      "name": "Victory retry resets player stats, objectives, resources, and enemies",
+      "kind": "actual input",
+      "status": "passed",
+      "durationMs": 35,
+      "details": {
+        "mode": "playing",
+        "elapsed": 0,
+        "hp": 100,
+        "level": 1,
+        "relays": 0
+      }
+    },
+    {
+      "name": "Lethal damage opens defeat and retry starts a clean run",
+      "kind": "QA damage setup; actual retry input",
+      "status": "passed",
+      "durationMs": 2186,
+      "details": {
+        "mode": "playing",
+        "hp": 100,
+        "elapsed": 0
+      }
+    },
+    {
+      "name": "Mobile menu and gameplay fit the viewport with visible touch controls",
+      "kind": "actual mobile browser rendering",
+      "status": "passed",
+      "durationMs": 2831,
+      "details": {
+        "menu": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "scrollHeight": 844
+        },
+        "gameplay": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "scrollHeight": 844
+        },
+        "touchControls": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        }
+      }
+    },
+    {
+      "name": "Desktop and mobile emitted no uncaught JavaScript errors",
+      "kind": "runtime monitoring",
+      "status": "passed",
+      "durationMs": 0,
+      "details": {
+        "uncaughtErrors": 0,
+        "consoleErrors": []
+      }
+    }
+  ],
+  "screenshots": [
+    "design/game-menu.png",
+    "design/game-gameplay.png",
+    "design/game-upgrades.png",
+    "design/game-victory.png",
+    "design/game-mobile.png"
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "finishedAt": "2026-10-10T16:05:21.307Z",
+  "passed": 13,
+  "failed": 0
+}

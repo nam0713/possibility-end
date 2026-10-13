@@ -1,14 +1,21 @@
 {
   "name": "possibility-end-cinematic-universe",
-  "version": "8.1.0",
+  "version": "9.0.0",
   "private": true,
-  "description": "가능성의 끝 — cover spacing and native mobile scroll performance",
+  "description": "가능성의 끝 — one particle universe (three.js), revised text, new reader",
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
     "build": "node build.mjs",
+    "build:universe": "node tools/build-universe.mjs",
     "preview": "node server.mjs",
-    "check": "node --check src/app.js && node --check src/cosmos.js && node --check build.mjs && node --check server.mjs && node --check src/ending.js && node --check src/audio.js && node --check src/cinematic.js"
+    "game": "node server.mjs",
+    "build:game": "node build-game.mjs",
+    "check:game": "node --check game/game.js && node --check game/world.js && node --check game/rules.js && node --check game/audio.js && node --check build-game.mjs",
+    "test:game": "node --test tests/game-rules.test.mjs",
+    "check": "node --check src/app.js && node --check src/audio.js && node --check build.mjs && node --check server.mjs",
+    "test:site": "node tests/site-smoke.mjs",
+    "test:content": "node tests/verify-content.mjs"
   },
   "engines": {
     "node": ">=18"

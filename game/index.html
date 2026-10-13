@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080e17">
+  <meta name="description" content="가능성의 끝의 우주에서 펼쳐지는 3D 생존 액션. 마지막 정비 드론으로 릴레이를 깨우고, 무너지는 다이슨 군체를 탈출하세요.">
+  <title>LAST LIGHT — 가능성의 끝</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23080e17'/%3E%3Cellipse cx='32' cy='32' rx='23' ry='12' transform='rotate(-35 32 32)' stroke='%23f18b68' fill='none' stroke-width='3'/%3E%3Ccircle cx='48' cy='19' r='4' fill='%23eee9dc'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="붕괴하는 다이슨 군체의 3D 게임 장면"></canvas>
+  <div class="scene-vignette" aria-hidden="true"></div>
+
+  <main id="menu" class="menu-screen">
+    <header class="menu-header">
+      <a class="world-mark" href="../index.html" aria-label="가능성의 끝 원작 읽기">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="16" rx="14" ry="6" transform="rotate(-35 16 16)"/><ellipse cx="16" cy="16" rx="6" ry="14" transform="rotate(-35 16 16)"/><circle cx="26" cy="9" r="2"/></svg>
+        <span>가능성의 끝</span>
+      </a>
+      <span class="edition-label">하나의 우주, 마지막 신호</span>
+      <a class="original-link" href="../index.html">원작 읽기 <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <div class="menu-content">
+      <p class="eyebrow"><span class="signal-dot" aria-hidden="true"></span> 궤도 생존 액션 <span class="small-cross" aria-hidden="true">+</span> 01</p>
+      <h1>LAST<br><span>LIGHT<span class="title-period">.</span></span></h1>
+      <p class="title-korean">가능성의 끝</p>
+      <p class="menu-story">붕괴하는 다이슨 군체.<br>마지막 정비 드론으로 세 개의 릴레이를 깨우고,<br>새 우주로 빛을 보내세요.</p>
+
+      <div class="mission-summary" aria-label="생존, 강화, 탈출">
+        <span><i aria-hidden="true">01</i> 살아남고</span>
+        <span><i aria-hidden="true">02</i> 강해지고</span>
+        <span><i aria-hidden="true">03</i> 빛을 보내라</span>
+      </div>
+
+      <div class="start-actions">
+        <button id="start-button" class="primary-button start-button" disabled><span>출격하기</span><span class="button-arrow" aria-hidden="true">↗</span></button>
+        <div class="difficulty-control" aria-label="난이도 선택">
+          <span class="difficulty-caption">난이도</span>
+          <button id="difficulty-normal" aria-pressed="true" title="표준 난이도">탐사</button>
+          <span class="difficulty-divider" aria-hidden="true"></span>
+          <button id="difficulty-hard" aria-pressed="false" title="적이 더 강한 도전 난이도">붕괴</button>
+        </div>
+      </div>
+      <div id="loading" class="loading-status" role="status"><span class="loading-line" aria-hidden="true"></span> 궤도 시스템 연결 중</div>
+      <p class="run-note">매 출격마다 달라지는 강화. 한 번의 탈출.</p>
+    </div>
+
+    <aside class="scene-annotation" aria-hidden="true">
+      <span class="annotation-line"></span>
+      <div><span class="annotation-code">DYSON SWARM / SECTOR 07</span><p>마지막 항성의 궤도</p><span class="annotation-status"><i></i> 릴레이 신호 대기</span></div>
+    </aside>
+
+    <footer class="menu-footer">
+      <div class="control-guide"><div><kbd>W A S D</kbd><span>이동</span></div><div><span class="mouse-glyph" aria-hidden="true"></span><span>조준 · 누르고 발사</span></div><div><kbd>SPACE</kbd><span>돌진</span></div><div><kbd>Q / 우클릭</kbd><span>충격파</span></div><div><kbd>E</kbd><span>작동</span></div></div>
+      <span class="footer-serial">정비 드론 <b>LL–01</b><span class="footer-cross" aria-hidden="true">+</span></span>
+    </footer>
+  </main>
+
+  <div id="hud" class="hud" hidden>
+    <div class="hud-top">
+      <div class="hud-wordmark"><span class="hud-symbol" aria-hidden="true">✳</span><span>LAST LIGHT<small>드론 LL–01 · 신호 연결됨</small></span></div>
+      <div class="run-clock"><span class="hud-label">경과 시간</span><strong id="time-text">00:00</strong><span class="clock-rule" aria-hidden="true"></span><span class="threat-label">시간이 흐를수록 위험해집니다</span></div>
+      <div class="run-resources"><div class="resource-block"><span class="hud-label">고철</span><strong><span class="scrap-icon" aria-hidden="true">◇</span><span id="scrap-text">0</span></strong></div><div class="resource-block relay-resource"><span class="hud-label">릴레이</span><strong><span id="relay-count">0</span><span class="resource-limit">/ 3</span></strong></div><button id="pause-button" class="icon-button pause-icon" title="일시 정지 (Esc)" aria-label="일시 정지"><i></i><i></i></button></div>
+    </div>
+
+    <div class="objective-block"><span class="objective-index"><i aria-hidden="true"></i> 현재 목표</span><h2 id="objective-title">릴레이를 가동하세요</h2><p id="objective-detail">고철을 모아 비활성 릴레이에 접근하세요.</p></div>
+
+    <div id="boss-hud" class="boss-hud" hidden><div class="boss-heading"><span class="boss-warning">위협 감지</span><strong id="boss-name">군체의 수호자</strong></div><div class="boss-track"><div id="boss-fill" class="boss-fill"></div></div></div>
+
+    <div id="interact-prompt" class="interact-prompt" hidden><kbd>E</kbd><span>릴레이 작동</span></div>
+
+    <div class="hud-bottom">
+      <div class="player-status">
+        <div class="health-heading"><span class="hud-label"><span class="health-cross" aria-hidden="true">+</span> 기체 내구도</span><strong id="health-text">100 / 100</strong></div>
+        <div class="health-track"><div id="health-fill" class="health-fill"></div><div class="health-ticks" aria-hidden="true"></div></div>
+        <div class="ability-row"><div class="ability"><span class="ability-key">SPACE</span><div class="ability-info"><span>돌진</span><div class="ability-track"><div id="dash-fill"></div></div></div><span class="ability-symbol" aria-hidden="true">↗</span></div><div class="ability pulse-ability"><span class="ability-key">Q</span><div class="ability-info"><span>충격파</span><div class="ability-track"><div id="pulse-fill"></div></div></div><span class="ability-symbol" aria-hidden="true">◎</span></div></div>
+      </div>
+      <div class="hud-hint"><span><kbd>WASD</kbd> 이동</span><span><span class="mouse-glyph" aria-hidden="true"></span> 조준 · 발사</span><span><kbd>Q</kbd> 충격파</span><span><kbd>E</kbd> 작동</span><span><kbd>ESC</kbd> 일시 정지</span></div>
+    </div>
+    <div class="xp-block"><div class="xp-heading"><span>기체 레벨 <strong id="level-text">01</strong></span><span>파편을 모아 업그레이드</span></div><div class="xp-track"><div id="xp-fill"></div></div></div>
+  </div>
+
+  <section id="upgrade-screen" class="overlay upgrade-screen" hidden aria-labelledby="upgrade-title">
+    <div class="overlay-content upgrade-content"><span class="overlay-eyebrow"><span class="signal-dot" aria-hidden="true"></span> 기체 진화 가능</span><div class="upgrade-heading"><h2 id="upgrade-title">다음 가능성을<br>선택하세요<span>.</span></h2><p>하나의 강화가 다음 출격을 바꿉니다.<br>지금은 시간이 멈춰 있습니다.</p></div><div id="upgrade-options" class="upgrade-options"></div><p class="upgrade-footnote">클릭 또는 1 · 2 · 3 선택 <span aria-hidden="true">+</span> 강화는 이번 출격 동안 유지됩니다</p></div>
+  </section>
+
+  <section id="pause-screen" class="overlay pause-screen" hidden aria-labelledby="pause-title">
+    <div class="overlay-content pause-content"><span class="overlay-eyebrow">신호 일시 정지</span><h2 id="pause-title">잠시,<br>궤도에 머물다<span>.</span></h2><p class="overlay-description">당신이 돌아올 때까지 우주는 기다립니다.</p><div class="overlay-actions"><button id="resume-button" class="primary-button"><span>계속하기</span><span class="button-arrow" aria-hidden="true">↗</span></button><button id="restart-button" class="text-button">처음부터 다시 <span aria-hidden="true">↻</span></button></div><div class="pause-controls"><span><kbd>WASD</kbd> 이동</span><span><kbd>SPACE</kbd> 돌진</span><span><kbd>Q / 우클릭</kbd> 충격파</span><span><kbd>E</kbd> 작동</span><span><kbd>ESC</kbd> 계속하기</span></div></div>
+  </section>
+
+  <section id="end-screen" class="overlay end-screen" hidden aria-labelledby="end-title">
+    <div class="overlay-content end-content"><span class="overlay-eyebrow">출격 기록 / LL–01</span><h2 id="end-title">신호가 끊겼습니다.</h2><p id="end-description" class="overlay-description">끝은 다시 시작할 수 있는 또 하나의 가능성입니다.</p><div id="end-stats" class="end-stats"></div><div class="overlay-actions"><button id="retry-button" class="primary-button"><span>다시 출격</span><span class="button-arrow" aria-hidden="true">↗</span></button><button id="menu-button" class="text-button">시작 화면으로 <span aria-hidden="true">←</span></button></div><a href="../index.html" class="end-original">이 우주의 이야기를 읽어보세요 <span aria-hidden="true">↗</span></a></div>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="hit-flash" class="hit-flash" aria-hidden="true" hidden></div>
+  <button id="sound-button" class="sound-button" aria-label="사운드 켜기" aria-pressed="false" title="사운드 켜기 / 끄기"><svg class="sound-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="sound-waves" d="M16 8c2 2 2 6 0 8m3-11c4 4 4 10 0 14"/><path class="sound-off" d="m17 9 5 6m0-6-5 6"/></svg><span>사운드</span></button>
+
+  <div id="touch-controls" class="touch-controls" hidden><div id="joystick-zone" class="joystick-zone" aria-label="이동 조이스틱"><div class="joystick-ring"></div><div id="joystick-knob" class="joystick-knob"></div></div><div class="touch-action-buttons"><button id="touch-interact" class="touch-interact" aria-label="작동">작동</button><button id="touch-dash" class="touch-dash" aria-label="돌진">돌진 <span aria-hidden="true">↗</span></button><button id="touch-fire" class="touch-fire" aria-label="조준한 방향으로 발사"><span aria-hidden="true">⌖</span>발사</button></div></div>
+  <script type="module" src="./game.js"></script>
+</body>
+</html>

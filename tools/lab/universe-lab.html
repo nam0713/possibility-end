@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Universe Lab</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./universe-lab.css">
+<script>
+  // ?nowebgl=1: simulate a browser without WebGL before the bundle loads.
+  if (/[?&]nowebgl=1/.test(location.search)) {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      return /webgl/i.test(type) ? null : original.call(this, type, ...rest);
+    };
+  }
+</script>
+</head>
+<body>
+<canvas id="universe-canvas" aria-hidden="true"></canvas>
+<div id="node-layer" aria-hidden="true"></div>
+<div id="layout-guides" aria-hidden="true"></div>
+
+<aside id="panel" aria-label="Universe lab controls">
+  <header>
+    <strong>Universe Lab</strong>
+    <span id="status" class="mono">…</span>
+    <button id="toggle-panel" class="ghost" aria-expanded="true" title="Hide panel (H)">—</button>
+  </header>
+  <div class="body">
+    <section>
+      <h2>Scene</h2>
+      <div class="row">
+        <button data-scene="cover" data-layout="hero">cover · hero</button>
+        <button data-scene="cover" data-layout="explore" data-interactive="1">cover · explore</button>
+        <button data-scene="ending-ready">ending-ready</button>
+      </div>
+      <div class="row grid8" id="preview-buttons"><span class="label">preview</span></div>
+      <div class="row grid8" id="chapter-buttons"><span class="label">chapter</span></div>
+    </section>
+    <section>
+      <h2>Layout</h2>
+      <div class="row" id="layout-buttons"></div>
+    </section>
+    <section>
+      <h2>Reading · veil · scatter</h2>
+      <label class="slider">reading <input id="reading" type="range" min="0" max="1" step="0.01" value="0"><output>0</output></label>
+      <label class="slider">veil <input id="veil" type="range" min="0" max="1" step="0.01" value="0"><output>0</output></label>
+      <label class="slider">scatter <input id="scatter" type="range" min="0" max="1" step="0.01" value="0"><output>0</output></label>
+      <label class="slider">pointer x <input id="px" type="range" min="-1" max="1" step="0.01" value="0"><output>0</output></label>
+      <label class="slider">pointer y <input id="py" type="range" min="-1" max="1" step="0.01" value="0"><output>0</output></label>
+    </section>
+    <section>
+      <h2>Toggles</h2>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="visible" checked> visible</label>
+        <label class="check"><input type="checkbox" id="interactive"> interactive</label>
+        <label class="check"><input type="checkbox" id="paused"> paused</label>
+        <label class="check"><input type="checkbox" id="arm"> arm seed</label>
+        <label class="check"><input type="checkbox" id="show-nodes" checked> node overlay</label>
+        <label class="check"><input type="checkbox" id="show-guides"> guides</label>
+      </div>
+      <div class="row">
+        <select id="quality" aria-label="quality">
+          <option value="auto">auto</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option>
+        </select>
+        <select id="select-node" aria-label="select node">
+          <option value="0">select: none</option>
+        </select>
+        <button id="zoom-in">zoom +</button>
+        <button id="zoom-out">zoom −</button>
+        <button id="reset">reset</button>
+      </div>
+    </section>
+    <section>
+      <h2>Ending</h2>
+      <div class="row">
+        <button id="end-start">start</button>
+        <button id="end-pause">pause</button>
+        <button id="end-resume">resume</button>
+        <button id="end-skip">skip</button>
+        <button id="end-replay">replay</button>
+        <button id="end-stop">stop</button>
+      </div>
+      <label class="slider">seek <input id="seek" type="range" min="0" max="32" step="0.1" value="0"><output>0</output></label>
+    </section>
+    <section>
+      <h2>Diagnostics</h2>
+      <div class="row">
+        <button id="settle">settle</button>
+        <button id="freeze">freeze time</button>
+        <button id="lose">lose context</button>
+        <button id="restore">restore context</button>
+        <button id="dump">dump state</button>
+      </div>
+      <pre id="state" class="mono"></pre>
+      <pre id="events" class="mono"></pre>
+    </section>
+  </div>
+</aside>
+
+<script src="/src/generated/universe.js"></script>
+<script src="./universe-lab.js"></script>
+</body>
+</html>

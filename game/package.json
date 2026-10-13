@@ -1,0 +1,11 @@
+{
+  "name": "last-light-game",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vendor": "node prepare.mjs",
+    "check": "node --check game.js && node --check world.js && node --check audio.js && node --check rules.js"
+  },
+  "dependencies": { "three": "0.186.1" }
+}

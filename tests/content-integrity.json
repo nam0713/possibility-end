@@ -1,14 +1,65 @@
 {
-  "edited_manuscript_sha256": "9db95b7b7096ae063097b4e237cc91a3ed99bfdd7c611e5d7b8de39c048e04e5",
-  "original_manuscript_sha256": "129dc237240ce3bd90c9dd4d408957031c9a7e39104542110404e27cf9e13ba5",
-  "corrections": 18,
-  "chapters": 8,
-  "blocks": 215,
-  "chapter_data_matches_edited_manuscript": true,
-  "no_js_fallback_matches_edited_manuscript": true,
-  "html_sha256": "7bb1ce8f88c321f91fa298cb97ae012b1af235e4abb4a191b49a05c33b8cc23d",
+  "version": "9.0.0",
+  "manuscript": {
+    "file": "src/manuscript.txt",
+    "sha256": "8b2a78940aac5fa17ad47804db58ebd7ebe8bbc36ab8e2a525e25fc0664f91c3",
+    "chapters": 8,
+    "blocks": 215,
+    "paragraphs_per_chapter": [
+      32,
+      16,
+      19,
+      14,
+      16,
+      16,
+      16,
+      86
+    ],
+    "characters_without_spaces": [
+      2295,
+      1446,
+      1649,
+      1205,
+      978,
+      920,
+      1205,
+      3925
+    ],
+    "minutes": [
+      6,
+      4,
+      4,
+      3,
+      3,
+      3,
+      3,
+      9
+    ]
+  },
+  "original_manuscript": {
+    "file": "src/manuscript.original.txt",
+    "sha256": "9db95b7b7096ae063097b4e237cc91a3ed99bfdd7c611e5d7b8de39c048e04e5",
+    "is_v8_1_manuscript": true
+  },
+  "html_sha256": {
+    "index.html": "02bf5726f82f8a2ea0bc1486f79cdbcb9bf709d73d460774dabc0d0489b9a239",
+    "dist/index.html": "02bf5726f82f8a2ea0bc1486f79cdbcb9bf709d73d460774dabc0d0489b9a239"
+  },
   "audio_sha256": {
-    "first-light.mp3": "4555ffe7fe255a53167a8a2e2cfbca7688c4873e321073659debb6cf89532e7b",
-    "horizon.mp3": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e"
-  }
+    "horizon.mp3": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e",
+    "first-light.mp3": "4555ffe7fe255a53167a8a2e2cfbca7688c4873e321073659debb6cf89532e7b"
+  },
+  "verified": {
+    "chapter_data_matches_manuscript": true,
+    "no_js_fallback_matches_manuscript": true,
+    "reader_data_matches_chapters_json": true,
+    "inlined_audio_matches_files": true,
+    "brief_verbatim_lines": 12,
+    "decks_from_manuscript": 8,
+    "pull_quotes": 6,
+    "ending_captions": 7,
+    "structure_matches_original": true
+  },
+  "checks": 96,
+  "warnings": []
 }

@@ -1,0 +1,57 @@
+:root {
+  --bg: #04070b;
+  --ink: #eaf2f8;
+  --ice: #a9e7f2;
+  --accent: #a9e7f2;
+  --accent-hi: #e6fbff;
+  --accent-deep: #4f8fb0;
+  --dim: rgba(234, 242, 248, 0.55);
+  --line: rgba(169, 231, 242, 0.18);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 12px/1.45 ui-monospace, "DM Mono", Consolas, monospace; overflow: hidden; }
+.mono { font-family: ui-monospace, "DM Mono", Consolas, monospace; }
+#universe-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; pointer-events: none; touch-action: none; }
+html.explore #universe-canvas { pointer-events: auto; cursor: grab; }
+html.explore #universe-canvas:active { cursor: grabbing; }
+
+#node-layer { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+#node-layer .node { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid rgba(169, 231, 242, 0.55); border-radius: 50%; transition: opacity 0.2s; }
+#node-layer .node span { position: absolute; left: 30px; top: 4px; font-size: 10px; letter-spacing: 0.08em; color: var(--dim); white-space: nowrap; }
+#node-layer .node.hidden { opacity: 0; }
+#node-layer .node.selected { border-color: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent); }
+/* The formation's anchor: a hairline crosshair on its focal point. */
+#node-layer .anchor { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; transition: opacity 0.2s; }
+#node-layer .anchor::before, #node-layer .anchor::after { content: ""; position: absolute; background: rgba(169, 231, 242, 0.75); }
+#node-layer .anchor::before { left: 16px; top: 0; width: 1px; height: 100%; }
+#node-layer .anchor::after { top: 16px; left: 0; height: 1px; width: 100%; }
+#node-layer .anchor.hidden { opacity: 0; }
+
+#layout-guides { position: fixed; inset: 0; z-index: 1; pointer-events: none; display: none; }
+#layout-guides.on { display: block; }
+#layout-guides i { position: absolute; border: 1px dashed rgba(79, 143, 176, 0.75); border-radius: 50%; }
+#layout-guides b { position: absolute; width: 9px; height: 9px; margin: -4px 0 0 -4px; border-left: 1px solid var(--accent); border-top: 1px solid var(--accent); transform: rotate(45deg); }
+
+#panel { position: fixed; top: 12px; right: 12px; z-index: 5; width: 360px; max-height: calc(100% - 24px); overflow: auto; background: rgba(4, 7, 11, 0.86); border: 1px solid var(--line); }
+#panel header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(4, 7, 11, 0.96); }
+#panel header strong { letter-spacing: 0.12em; text-transform: uppercase; font-size: 11px; }
+#status { color: var(--ice); flex: 1; }
+#panel.collapsed .body { display: none; }
+#panel.hidden { display: none; }
+.body { padding: 4px 12px 12px; }
+section { padding: 8px 0; border-bottom: 1px solid var(--line); }
+h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.row { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; align-items: center; }
+.grid8 .label { width: 56px; color: var(--dim); }
+button, select { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 4px 7px; min-height: 26px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--ice); }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-hi); }
+button.ghost { border: 0; padding: 0 6px; }
+.slider { display: grid; grid-template-columns: 68px 1fr 36px; align-items: center; gap: 6px; margin: 3px 0; color: var(--dim); }
+.slider input { width: 100%; accent-color: var(--accent); }
+.check { display: inline-flex; gap: 4px; align-items: center; margin-right: 8px; color: var(--dim); }
+pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: var(--dim); max-height: 220px; overflow: auto; font-size: 11px; }
+@media (max-width: 640px) {
+  #panel { width: auto; left: 8px; right: 8px; top: auto; bottom: 8px; max-height: 46%; }
+}

@@ -22,7 +22,8 @@
 // mobile-dial (v9.1 amendment 3: the phone cover's chapter dial under real touch swipes — a horizontal swipe
 // turns one chapter and Universe.focusNode brings that node to the front, a vertical one scrolls; dots, nodes,
 // keys, 이 장 읽기 with and without a saved place; no overlap at 320×568 / 390×844; the wide cover sideways and on
-// desktop), layout-1440 / layout-390 / layout-320 (no horizontal overflow and no text cut off at the edges:
+// desktop), mobile-home (phones below the cover: a plain page over the reading starfield — the ring disperses,
+// setScatter 1 in the contents and 0 back on the cover —, the whole list visible, the top bar kept), layout-1440 / layout-390 / layout-320 (no horizontal overflow and no text cut off at the edges:
 // home sections, sheets, chapters, the film and its finale), nowebgl (?nowebgl=1 renders and reads;
 // one CSS seed, the cold CSS film; a browser with no WebGL at all), reduced (prefers-reduced-motion:
 // still universe, static text, four stills). Each group also fails on any console error or uncaught
@@ -832,6 +833,83 @@ const groups = {
       checkErrors(errors, ignored, ` ${width}×${height}`);
       await context.close();
     }
+  },
+
+  /* Phones below the cover (same test as the dial): a plain page over the reading starfield — the
+   * cover's ring disperses as the cover leaves (Universe.setScatter(1), the cover scene kept, veil
+   * 0) and gathers again on the way back (scatter 0, the dial's node held at the front); the list of
+   * chapters is whole and nothing fades, pins or overlaps; the top bar stays. */
+  async 'mobile-home'() {
+    const look = page => page.evaluate(() => {
+      const u = window.Universe?.getState?.() || {};
+      const op = el => { let o = 1; for (let e = el; e && e !== document.documentElement; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+      const bar = document.getElementById('topbar');
+      const b = bar.getBoundingClientRect();
+      const sel = '.section-head, .toc-link > span:not(.toc-bar), .iq-line, .interlude-link, .litany-line, .litany-final, .footer-work, .footer-link';
+      const boxes = [...document.querySelectorAll(sel)].filter(e => e.getClientRects().length).map(e => ({ e, r: e.getBoundingClientRect() })).filter(({ r }) => r.bottom > b.bottom && r.top < innerHeight);
+      const overlaps = [];
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const A = boxes[i].r, B = boxes[j].r;
+        if (A.top < B.bottom - 1 && B.top < A.bottom - 1 && A.left < B.right - 1 && B.left < A.right - 1) overlaps.push(`${boxes[i].e.className}×${boxes[j].e.className}`);
+      }
+      return {
+        y: Math.round(scrollY), section: document.body.dataset.section, scene: u.scene, layout: u.layout, veil: u.veil, scatter: u.scatter, target: u.scatterTarget, focused: u.focusedNode ?? null, dial: NovelUI.dial(),
+        bar: { top: Math.round(b.top), shown: !bar.classList.contains('is-hidden') && b.top >= 0, solid: bar.classList.contains('is-solid'), brand: Number(getComputedStyle(bar.querySelector('.brand')).opacity) },
+        faint: boxes.filter(({ e }) => op(e) < 0.99).map(({ e }) => e.className).slice(0, 4), overlaps,
+        plate: Number(getComputedStyle(document.getElementById('sky-figure')).opacity),
+      };
+    });
+    for (const [width, height] of [[390, 844], [320, 568]]) {
+      const { context, page, errors, ignored } = await openPage({ width, height, mobile: true, dpr: 2 });
+      const tag = `${width}×${height}`;
+      await load(page, urlFor('#home'));
+      const live = await page.evaluate(() => typeof Universe.setScatter === 'function' && Universe.getState().renderer === 'webgl');
+      // The contents, whole: every line of every row visible, nothing banded or pinned.
+      const list = await page.evaluate(() => {
+        const op = el => { let o = 1; for (let e = el; e && e !== document.documentElement; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+        const parts = [...document.querySelectorAll('.toc-link > span:not(.toc-bar)')];
+        return { parts: parts.length, faint: parts.filter(p => op(p) < 0.99).length, stage: getComputedStyle(document.querySelector('.contents-stage')).display, litany: Math.round(document.getElementById('litany').getBoundingClientRect().height), sticky: getComputedStyle(document.querySelector('.litany-stage')).position };
+      });
+      check(`${tag}: the contents are a plain list (no band, no pinned litany)`, list.stage === 'none' && list.sticky !== 'sticky' && list.litany < height * 1.6, list);
+      // Scroll down the whole page in steps, as a reader would (the bar sees downward scrolls).
+      const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+      const bad = [];
+      let atContents = null;
+      for (let y = Math.round(height * 0.75); ; y = Math.min(max, y + Math.round(height * 0.6))) {
+        await page.evaluate(y => scrollTo({ top: y, behavior: 'instant' }), y);
+        await page.waitForTimeout(y === Math.round(height * 0.75) ? 2600 : 900);
+        const s = await look(page);
+        if (s.section === 'contents' && !atContents) atContents = s;
+        if (!s.bar.shown || !s.bar.solid || s.bar.brand < 0.99 && width >= 360 || s.faint.length || s.overlaps.length || s.scene !== 'cover' || s.target < 0.99) bad.push(s);
+        if (y >= max) break;
+      }
+      check(`${tag}: below the cover — top bar shown and solid, every line whole, no overlaps, the cover's scene dispersed (scatter 1)`, bad.length === 0, bad.slice(0, 2));
+      if (live) check(`${tag}: in the contents the ring has dispersed (engine scatter ≈ 1, veil 0, cover scene)`, atContents && atContents.scatter > 0.95 && atContents.veil < 0.01 && atContents.scene === 'cover' && atContents.focused === 0, atContents);
+      await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+      await page.waitForTimeout(3000);
+      const top = await look(page);
+      check(`${tag}: back on the cover the ring gathers (scatter ≈ 0) and holds the dial's node`, top.target === 0 && (!live || (top.scatter < 0.05 && top.focused === top.dial.chapter)) && top.dial.held === top.dial.chapter, top);
+      if (width === 390) {
+        // A route into the contents (목차 at a chapter's end): dispersed at once, the heading under the bar.
+        await go(page, '#chapter-2');
+        await go(page, '#contents');
+        const s = await look(page);
+        const head = await page.evaluate(() => Math.round(document.getElementById('contents-title').getBoundingClientRect().top - document.getElementById('topbar').getBoundingClientRect().bottom));
+        check('#contents from a chapter: the ring stays dispersed, the heading clear of the bar', s.section === 'contents' && s.target === 1 && s.scene === 'cover' && head >= 8 && head <= 60, { ...s, head });
+      }
+      await checkOverflow(page, `${tag} home`);
+      checkErrors(errors, ignored);
+      await context.close();
+    }
+    // Without WebGL: the fallback ring's plate disperses the same way.
+    const { context, page, errors, ignored } = await openPage({ width: 390, height: 844, mobile: true, dpr: 2 });
+    await load(page, urlFor('#home', '?nowebgl=1'));
+    await page.evaluate(() => document.getElementById('contents').scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await page.waitForTimeout(2600);
+    const s = await look(page);
+    check('?nowebgl=1 phone: the fallback ring disperses below the cover, the nodes leave', s.plate < 0.05 && !(await page.evaluate(() => document.getElementById('node-layer').classList.contains('is-shown'))), s);
+    checkErrors(errors, ignored, ' (no WebGL)');
+    await context.close();
   },
 
   async nowebgl() {

@@ -1092,7 +1092,8 @@
       if (dialOn && frame && frame.nodes && body.dataset.view === 'home' && (frame.scene === undefined || frame.scene === 'cover')) placeDial(frame);
       fadeActions();
       if (!frame || !frame.nodes) return;
-      const show = body.dataset.view === 'home' && heroActive && (frame.scene === undefined || frame.scene === 'cover');
+      // (Phones: the nodes leave as the ring disperses below the cover.)
+      const show = body.dataset.view === 'home' && heroActive && (frame.scene === undefined || frame.scene === 'cover') && !(dialOn && scatterTarget > 0.3);
       if (nodeLayer.classList.contains('is-shown') !== show) nodeLayer.classList.toggle('is-shown', show);
       if (!show) return;
       if (geometryStale || performance.now() - geometry.stamp > 600) readGeometry();
@@ -1529,6 +1530,15 @@
       fitActions();
       if (body.dataset.view === 'home' && section === 'hero') compose(coverLayout());
       syncFocus();
+      // The page below the cover changes with the mode (phones: plain; otherwise the formations,
+      // the band and the pinned litany): every section is composed again for the new mode.
+      litanyStep = -1;
+      if (!on) {
+        // (Its lines come in again one by one, as the litany is reached.)
+        for (const li of $$('.litany-line')) li.classList.remove('is-in', 'is-past', 'is-current');
+        $('litany-final').classList.remove('is-in');
+      }
+      if (!force && body.dataset.view === 'home' && section) onScroll(true);
       placeFallbackNodes();
     }
 
@@ -1704,7 +1714,8 @@
       $('stage-num').textContent = pad(n);
       $('stage-name').textContent = chapterOf(n).figure;
       clearTimeout(previewTimer);
-      const apply = () => { if (section === 'contents') stage('preview', { chapter: n, layout: 'contents' }); };
+      // (Phones show no preview formations: the contents rest over the calm starfield.)
+      const apply = () => { if (section === 'contents' && !dialOn) stage('preview', { chapter: n, layout: 'contents' }); };
       if (immediate) apply(); else previewTimer = setTimeout(apply, 90);
     }
     function bindContents() {
@@ -1850,7 +1861,21 @@
         li.classList.toggle('is-in', i <= step);
       });
       $('litany-final').classList.toggle('is-in', step >= steps - 1);
-      if (section === 'litany') stage('preview', { chapter: litanyChapters[step] || 7, layout: litanyLayout() });
+      if (section === 'litany' && !dialOn) stage('preview', { chapter: litanyChapters[step] || 7, layout: litanyLayout() });
+    }
+
+    /* Phones (the dial's test, html.has-dial): only the cover is special. From the contents down the
+     * home page is a plain page over the reading starfield — the cover's ring disperses as the cover
+     * leaves (scroll-linked, like the reader's entry into its text) and gathers again on the way
+     * back; no preview formations, no band, no dissolving lines, nothing pinned (site.css 15). The
+     * ramp runs over the cover's last part: from 5 % of a screen of scroll until the contents' top
+     * reaches 60 % of the screen, just before the hand-over to the contents (at 50 %). `y`: a scroll
+     * position to evaluate (a page about to be restored); the cover is one screen tall. */
+    function coverScatter(y = scrollY) {
+      if (!dialOn || exploring) return 0;
+      const h = innerHeight;
+      const end = Math.max(1, (hero.offsetHeight || h) - h * 0.6);
+      return smooth(Math.min(h * 0.05, end * 0.5), end, y);
     }
 
     /** Which home section holds the middle of the viewport; drives the universe scene. */
@@ -1863,6 +1888,17 @@
         if (rect.top <= probe && rect.bottom > 0) next = name;
       }
       if (heroActive && $('home').getBoundingClientRect().bottom > probe) next = 'hero';
+      if (dialOn) {
+        // Phones: the plain page below the cover (the litany is its static list, all lines in).
+        clearRowFade();
+        fadeInterlude(false);
+        updateLitany(1);
+        setSection(next, force);
+        scatter(coverScatter());
+        measureFloor();
+        fadeActions();
+        return;
+      }
       // Litany progress (sticky stage inside a tall section).
       const litany = $('litany').getBoundingClientRect();
       // (Reduced motion sets the litany as a static list, about a screen tall (site.css): it is all
@@ -1914,17 +1950,20 @@
       section = next;
       body.dataset.section = next;
       const tall = isTall();
+      // Phones: the cover's scene throughout (its ring disperses below the cover: coverScatter).
+      if (dialOn) { stage('cover', { layout: coverLayout() }); veil(0); }
       // Text never lies on a lit formation: portrait screens compose the formation in a band
       // above the text (tall ‘contents’ composition); wide screens put it beside the text.
-      if (next === 'hero') { stage('cover', { layout: coverLayout() }); veil(0); }
+      else if (next === 'hero') { stage('cover', { layout: coverLayout() }); veil(0); }
       // (Wide screens: the formation has its own column beside the rows, or, where the rows take the
       // full width, it is veiled behind them.)
       else if (next === 'contents') { stage('preview', { chapter: previewN, layout: 'contents' }); veil(tall ? 0.22 : $('contents').querySelector('.contents-stage').offsetWidth > 0 ? 0.08 : 0.8); }
       else if (next === 'interlude') { stage('preview', { chapter: 3, layout: 'contents' }); veil(tall ? 0.38 : 0.32); }
       else if (next === 'litany') { stage('preview', { chapter: litanyChapters[Math.max(0, litanyStep)] || 1, layout: litanyLayout() }); veil(tall ? 0.38 : 0.18); }
       else if (next === 'footer') { veil(tall ? 0.5 : 0.6); }
-      // (The home sections keep their formations: nothing is scattered here.)
-      scatter(0);
+      // (Wide screens: the home sections keep their formations, nothing is scattered here. Phones:
+      // the cover's ring disperses as the cover leaves.)
+      scatter(coverScatter());
       // Phones: the dial's node is held at the front on the cover only.
       syncFocus();
     }
@@ -2064,6 +2103,9 @@
     return {
       init, enter, onScroll, setSection, placeNodes, placeFallbackNodes, select, renderResume,
       exitExplore, enterExplore, skipTarget, scrollToTarget, focusTarget, coverLayout, updateMode,
+      coverScatter,
+      /** Phones: below the cover the home page is a plain page (see coverScatter). */
+      get calm() { return dialOn; },
       /** The page is leaving the cover: no node stays pointed at or focused, and the dial lets the
        * ring go. */
       unlight() {
@@ -2709,7 +2751,9 @@
       bar.classList.toggle('is-solid', y > 24 || body.dataset.view === 'reader' && body.dataset.phase !== 'cover');
       const locked = document.querySelector('dialog[open]') || home.exploring || bar.contains(document.activeElement);
       const nearEnd = y + innerHeight >= document.documentElement.scrollHeight - 80;
-      if (locked || y < innerHeight * 0.5 || nearEnd) show();
+      // (Phones: the plain home page below the cover keeps its bar, as solid as the reader's.)
+      const kept = body.dataset.view === 'home' && home.calm;
+      if (locked || kept || y < innerHeight * 0.5 || nearEnd) show();
       else if (dy > 6) hide();
       else if (dy < -6) show();
     }
@@ -3316,13 +3360,17 @@
     }
 
     /** The universe starts moving first; then the page fades out, swaps, and fades in. `text`: the
-     * chapter opens inside its text (a saved place), where the stars are already scattered. */
-    async function transition(mine, route, apply, { text = false } = {}) {
+     * chapter opens inside its text (a saved place), where the stars are already scattered.
+     * `homeY`: where a returning home page will rest (phones: below the cover, the ring stays
+     * dispersed). */
+    async function transition(mine, route, apply, { text = false, homeY: homeScatterY = 0 } = {}) {
       pending = route;
       // The stars flow straight into the state the next page opens on: gathered into the formation
       // of a chapter's cover or of the cover, or scattered for a return into a chapter's text.
       if (route.view === 'reader') { stage('chapter', { chapter: route.chapter, layout: 'chapter' }); scatter(text ? 1 : 0); }
-      else if (route.target === 'home') { stage('cover', { layout: home.coverLayout() }); scatter(0); }
+      else if (route.target === 'home') { stage('cover', { layout: home.coverLayout() }); scatter(home.coverScatter(homeScatterY)); }
+      // (Phones: the contents and the footer rest over the cover's dispersed ring.)
+      else if (home.calm) { stage('cover', { layout: home.coverLayout() }); scatter(1); }
       veil(0);
       const animate = !isReduced() && !root.classList.contains('is-booting');
       if (animate) {
@@ -3385,7 +3433,7 @@
         // Focus follows the destination: the cover's title, the contents heading, the footer, or
         // (a restored position) the section in view.
         home.enter(route.target, restoreHomeY ? entryY ?? homeY : null, { focus: true });
-      });
+      }, { homeY: restoreHomeY ? entryY ?? homeY : 0 });
     }
 
     function go(hash, options = {}) {

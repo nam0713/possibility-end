@@ -1144,6 +1144,51 @@ html.is-leaving main { opacity: 0; }
   /* The film's caption spans the width here: the shade does too. */
   dialog.ending::before { height: 40%; background: linear-gradient(180deg, transparent, rgba(4, 7, 11, .5) 42%, rgba(4, 7, 11, .78)); }
 }
+/* Phones (the dial's test, html.has-dial): only the cover is special. From the contents down the
+   home page is calm and plain: the cover's ring has dispersed into the reading starfield behind it
+   (app.js coverScatter), and nothing is pinned, banded, dissolved or revealed on the way — the list
+   of chapters, the quote and the litany simply scroll by, and the top bar stays (app.js topbar). */
+html.has-dial .contents { padding: calc(var(--bar) + var(--safe-t) + 28px) var(--pad-r) 40px var(--pad-l); }
+html.has-dial .contents-stage { display: none; }
+/* The reader's scrim (10): the stars stay in view, dimmed behind the words. It fades in above the
+   contents' heading and out into the footer's own shade. */
+html.has-dial :is(.contents, .interlude, .litany) { isolation: isolate; }
+html.has-dial :is(.contents, .interlude, .litany)::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--scrim); }
+html.has-dial .contents::before {
+  top: -16svh;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 calc(16svh + var(--bar) + 12px));
+  mask-image: linear-gradient(180deg, transparent, #000 calc(16svh + var(--bar) + 12px));
+}
+html.has-dial .litany::before {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 88px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 88px), transparent);
+}
+html.has-dial .contents .section-head { opacity: 1; }
+html.has-dial.js.motion-ok :is(.contents, .interlude) [data-reveal]:not(.is-in) { opacity: 1; transform: none; }
+html.has-dial .toc-link {
+  grid-template-columns: 30px minmax(0, 1fr); grid-template-areas: "num title" "num en" "num deck" "num meta";
+  column-gap: 12px; padding: 22px 0 21px;
+}
+html.has-dial .toc-link > span { opacity: 1; }
+html.has-dial .toc-num { font-size: 12px; }
+html.has-dial .toc-title { font-size: clamp(26px, 8.2vw, 34px); line-height: 1.16; letter-spacing: -.045em; }
+html.has-dial .toc-en { padding: 5px 0 0; font-size: 10.5px; letter-spacing: .16em; }
+html.has-dial .toc-deck { margin-top: 10px; font-size: 14px; line-height: 1.7; }
+html.has-dial .toc-meta { margin-top: 10px; font-size: 12.5px; }
+html.has-dial .toc-bar { left: 42px; }
+/* (No current row here: no formation follows the list.) */
+html.has-dial .toc-row.is-active .toc-num { color: var(--fg-3); }
+html.has-dial .interlude {
+  min-height: 0; align-items: flex-start; justify-content: flex-start; gap: 14px; text-align: left;
+  padding: 56px var(--pad-r) 24px var(--pad-l);
+}
+html.has-dial .interlude-quote p { max-width: 12em; margin-inline: 0; font-size: clamp(21px, 6.4vw, 28px); }
+html.has-dial :is(.iq-line, .interlude-link > span) { opacity: 1; }
+html.has-dial .interlude-link.is-gone { pointer-events: auto; }
+html.has-dial .litany { height: auto; margin-bottom: 0; }
+html.has-dial .litany-stage { position: relative; height: auto; min-height: 0; justify-content: flex-start; padding: 40px var(--pad-r) 88px var(--pad-l); }
+html.has-dial .litany-line.is-current .litany-num { color: var(--fg-3); }
+
 /* Phones with the dial, shorter than ~740 px (375×667, 320×568): the ring is centred higher, so the
    title takes one line above it. */
 @media (max-height: 739px) {

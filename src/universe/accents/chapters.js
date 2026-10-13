@@ -4,12 +4,13 @@
 
 import * as THREE from 'three';
 import { C } from '../config.js';
+import { kelvin } from '../math.js';
 import { intelligenceGraph } from '../formations/intelligence.js';
 import { LATTICE } from '../formations/computation.js';
 import { FACTORIES, knotPoint } from '../formations/production.js';
 import { CRYSTAL, crystalSites, sitePosition } from '../formations/matter.js';
 import { GALAXIES, GALAXY_LOOK, THREADS } from '../formations/distance.js';
-import { keep, transform } from '../formations/common.js';
+import { transform } from '../formations/common.js';
 import { createGlow, createPulseLines, polylineSegments } from './materials.js';
 import { PACK, qRate } from '../particles/shaders.js';
 
@@ -33,13 +34,13 @@ const setLines = (lines, ctx, phase) => {
   if (phase !== undefined) u.uPhase.value = phase % 1;
 };
 
-/** Ch.1 — connection lines whose pulses accelerate through each cycle (and with reading). */
+/** Ch.1 — ice connection lines whose warm (4800 K) pulses accelerate through each cycle (and with reading). */
 export class IntelligenceAccent {
   constructor() {
     const { nodes, links } = intelligenceGraph();
     const segs = links.map(([a, b], k) => ({ a: nodes[a].p, b: nodes[b].p, t0: 0, t1: 1, seed: (k * 0.618) % 1 }));
-    this.lines = createPulseLines(segs, { base: 0.05, pulse: 0.85, density: 1, width: 0.05, color: C.ice, pulseColor: C.white });
-    this.core = createGlow({ core: C.white, halo: C.ice, scale: 0.42, intensity: 0.75, flicker: 0.04 });
+    this.lines = createPulseLines(segs, { base: 0.05, pulse: 0.8, density: 1, width: 0.05, color: C.ice, pulseColor: C.yellow });
+    this.core = createGlow({ core: C.core, halo: C.sun, scale: 0.42, intensity: 0.7, flicker: 0.04 });
     this.group = new THREE.Group();
     this.group.add(this.lines, this.core);
     this.phase = 0;
@@ -56,7 +57,7 @@ export class IntelligenceAccent {
   }
 }
 
-/** Ch.2 — faint lattice lines; aisle pulses advance in steps and wait at the chokepoints. */
+/** Ch.2 — faint lattice lines; ice aisle pulses advance in steps and wait at the white-hot chokepoints. */
 export class ComputationAccent {
   constructor() {
     const M = LATTICE.matrix;
@@ -94,8 +95,8 @@ export class ComputationAccent {
     this.aisles = createPulseLines(aisles, { base: 0.03, pulse: 0.75, density: 3, width: 0.05, step: true, color: C.ice, pulseColor: C.iceHi });
 
     this.gates = layers.map((y) => {
-      // The chokepoints: the floor's brightest light (white-hot core, ice-cyan halo).
-      const g = createGlow({ core: C.iceHi, halo: C.ice, scale: 0.36, intensity: 0.55, flicker: 0.08 });
+      // The chokepoints: the floor's brightest light (white-hot core in a warm 4800 K halo of heat).
+      const g = createGlow({ core: C.core, halo: C.yellow, scale: 0.36, intensity: 0.55, flicker: 0.08 });
       const p = T(0, y + 0.02, 0);
       g.position.set(p[0], p[1], p[2]);
       return g;
@@ -111,7 +112,7 @@ export class ComputationAccent {
   }
 }
 
-/** Ch.3 — the conveyor spine with flowing light (its gap closes with reading), factory glows. */
+/** Ch.3 — the conveyor spine with flowing light (its gap closes with reading), furnace glows at the factories. */
 export class ProductionAccent {
   constructor() {
     const pts = [];
@@ -129,7 +130,7 @@ export class ProductionAccent {
     });
     this.spine = createPulseLines(segs, { base: 0.05, pulse: 0.5, density: 0.9, width: 0.04, color: C.steel, pulseColor: C.white });
     this.factories = FACTORIES.map((t) => {
-      const g = createGlow({ core: C.iceHi, halo: C.ice, scale: 0.34, intensity: 0.45, flicker: 0.12 });
+      const g = createGlow({ core: C.sun, halo: C.orange, scale: 0.34, intensity: 0.45, flicker: 0.12 });
       const p = knotPoint(t, [0, 0, 0]);
       g.position.set(p[0], p[1], p[2]);
       return g;
@@ -145,7 +146,7 @@ export class ProductionAccent {
   }
 }
 
-/** Ch.4 — bonds between neighbouring lattice sites, revealed outward with the crystal. */
+/** Ch.4 — bonds between neighbouring lattice sites, revealed outward with the crystal; the warm seed's glow. */
 export class MatterAccent {
   constructor() {
     const sites = crystalSites();
@@ -162,7 +163,7 @@ export class MatterAccent {
       }
     }
     this.bonds = createPulseLines(segs, { base: 0.16, pulse: 0.22, density: 1, width: 0.2, color: C.ice, pulseColor: C.white });
-    this.seed = createGlow({ core: C.iceHi, halo: C.ice, scale: 0.42, intensity: 0.75, flicker: 0.05, breath: 0.05 });
+    this.seed = createGlow({ core: C.hot, halo: C.yellow, scale: 0.5, intensity: 0.34, flicker: 0.05, breath: 0.05 });
     this.spinner = new THREE.Group();
     this.spinner.add(this.bonds);
     this.group = new THREE.Group();
@@ -181,7 +182,7 @@ export class MatterAccent {
   }
 }
 
-/** Ch.6 — signal threads crawling between the galaxies; galaxy cores glow bright (pale) / deep (ice). */
+/** Ch.6 — ice signal threads crawling between the galaxies; the galaxy cores glow in their stars' light. */
 export class DistanceAccent {
   constructor() {
     this.group = new THREE.Group();
@@ -193,14 +194,14 @@ export class DistanceAccent {
         pts.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t]);
       }
       return createPulseLines(polylineSegments(pts, { seed: k * 0.31, tScale: 1 / Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]) }), {
-        base: 0.018, pulse: 0.42, density: 2, width: 0.03, color: C.steel, pulseColor: GALAXY_LOOK[GALAXIES[ia].kind].knot,
+        base: 0.018, pulse: 0.42, density: 2, width: 0.03, color: C.steel, pulseColor: C.ice,
       });
     });
     this.scaler = new THREE.Group();
     this.scaler.add(...this.threads);
     this.cores = GALAXIES.map((G) => {
       const L = GALAXY_LOOK[G.kind];
-      return createGlow({ core: L.core, halo: G.kind === 'bright' ? C.steel : C.deep, scale: G.r * 0.42, intensity: L.glow, breath: 0.03 });
+      return createGlow({ core: L.core, halo: L.halo, scale: G.r * 0.42, intensity: L.glow, breath: 0.03 });
     });
     this.group.add(this.scaler, ...this.cores);
   }
@@ -218,19 +219,20 @@ export class DistanceAccent {
 }
 
 /**
- * Ch.8 and the ending-ready seed: a glow, fragile (ch.8) or strong and breathing (ready). Both are
+ * Ch.8 and the ending-ready seed: a white-hot glow (a slightly warm white core in a sun-warm halo),
+ * fragile (ch.8) or strong and breathing (ready). Both are
  * centred on the formation's centre — the anchor — so the seed is one light. While the UI arms the
  * trigger (hover/focus: Universe.ending.arm), the ready seed brightens and breathes a little deeper
  * (ctx.arm, eased by the engine). light(): the glow as drawn, for the film's handover.
  */
-export const SEED_GLOW = { core: C.iceHi, halo: C.ice, scale: 0.72, intensity: 0.85, breath: 0.16, rays: 0.3, flicker: 0.02 };
-export const SEED_HALO = { core: [0, 0, 0], halo: keep(C.ice, C.deep, 0.5), scale: 2.2, intensity: 0.14, breath: 0.1 };
+export const SEED_GLOW = { core: C.core, halo: kelvin(5400), scale: 0.72, intensity: 0.85, breath: 0.16, rays: 0.3, flicker: 0.02 };
+export const SEED_HALO = { core: [0, 0, 0], halo: C.yellow, scale: 2.2, intensity: 0.085, breath: 0.1 };
 const ARM = { intensity: 0.4, breath: 0.1, scale: 0.1, halo: 0.6 };
 
 export class SeedAccent {
   constructor(strong) {
     this.strong = strong;
-    this.glow = strong ? createGlow(SEED_GLOW) : createGlow({ core: C.iceHi, halo: C.ice, scale: 0.5, intensity: 0.8, flicker: 0.22 });
+    this.glow = strong ? createGlow(SEED_GLOW) : createGlow({ core: C.core, halo: C.sun, scale: 0.5, intensity: 0.8, flicker: 0.22 });
     this.halo = strong ? createGlow(SEED_HALO) : null;
     this.glows = this.halo ? [this.glow, this.halo] : [this.glow];
     this.group = new THREE.Group();

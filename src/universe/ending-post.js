@@ -2,11 +2,12 @@
 //   scene (half-float) ← soft layer (low-res fireball and gas knots; blurred) ← threads (near full
 //   resolution, anti-aliased in their shader; zoom-blurred while inflating) ← particles, stars, planet
 //   bloom: 13-tap downsample chain (Karis-averaged first level) + tent upsample (additive)
-//   composite: gravitational lens + impact shockwave refraction, cold lens dispersion,
-//              exposure, ACES filmic, cool-shadow grade, vignette, film grain, sRGB.
-// Everything here stays inside the film's one cold hue family (ending-glsl.js PALETTE): the flash,
-// the shock front and the star's glare are ice-white, and the lens disperses light into ice and
-// deep-blue fringes (an RGB split would always put a warm fringe on one side).
+//   composite: gravitational lens + impact shockwave refraction, the camera lens's faint
+//              chromatic aberration, exposure, ACES filmic, a breath of cool-shadow grade,
+//              vignette, film grain, sRGB.
+// Physically motivated colour (ending-glsl.js): the flash is white with a breath of blue (the
+// hottest light of the film), the shock front blue-white inside and reddened outside, the star's
+// glare its own 5800 K, and the lens adds blue inner / red outer fringes as real glass does.
 import * as THREE from 'three';
 import { FULLSCREEN_VERT, HASH, PALETTE } from './ending-glsl.js';
 
@@ -131,8 +132,8 @@ vec3 shoulder(vec3 c) {
   return mix(m, vec3(top), smoothstep(1.0, 5.0, peak) * 0.55);
 }
 // Hue-preserving shoulder for the birth: the peak channel is compressed and the others follow in
-// proportion, so the cold fire keeps its ice and deep blue instead of greying out; only light far
-// past the shoulder burns through to white.
+// proportion, so the fire keeps its blackbody orange and red instead of washing out; only light
+// far past the shoulder burns through to white.
 vec3 incandescent(vec3 x) {
   float m = max(x.r, max(x.g, x.b));
   float mt = 1.0 - exp(-m);
@@ -155,24 +156,27 @@ void main() {
     p -= (p / max(r, 1e-5)) * defl;
   }
   // Impact shockwave: a refracting shell racing outward (derivative-of-Gaussian profile).
+  float shockSide = 0.0;
   if (uShockAmp > 0.0) {
     float x = (r - uShockR) / (0.045 + 0.05 * uShockR);
     float wave = x * exp(-x * x);
     shockEdge = exp(-x * x) * uShockAmp;
+    shockSide = smoothstep(-0.8, 0.8, x);
     p += (p / max(r, 1e-5)) * wave * uShockAmp * 0.035;
   }
   vec2 suv = uCenter + p / asp;
   vec2 fromC = suv - 0.5;
   float ca = (uAberration * 0.0035 + shockEdge * 0.006) * (0.3 + dot(fromC, fromC) * 3.0);
-  // Lens dispersion, cold: light displaced from nearer the centre adds an ice fringe, light from
-  // further out a deep-blue one (energy is only added, never split out of white into warm).
+  // The camera lens's chromatic aberration (gravitational lensing itself is achromatic): like a
+  // real lens it bends blue more than red — light displaced from nearer the centre adds a faint
+  // blue fringe, light from further out a faint red one (energy is only added, never split).
   vec3 col = texture2D(tScene, suv).rgb;
   if (ca > 0.0) {
     const vec3 Y = vec3(0.2126, 0.7152, 0.0722);
     float l0 = dot(col, Y);
     float lIn = dot(texture2D(tScene, suv - fromC * ca).rgb, Y);
     float lOut = dot(texture2D(tScene, suv + fromC * ca).rgb, Y);
-    col += P_ICE * max(lIn - l0, 0.0) * 0.45 + P_BLUE * max(lOut - l0, 0.0) * 0.4;
+    col += vec3(0.25, 0.45, 1.0) * max(lIn - l0, 0.0) * 0.4 + vec3(1.0, 0.3, 0.12) * max(lOut - l0, 0.0) * 0.25;
   }
   vec3 bloom = texture2D(tBloom, suv).rgb * uBloomNorm;
   // Energy-conserving bloom, plus (only at the handover) the engine's additive glow.
@@ -181,31 +185,32 @@ void main() {
   vec2 vq = (vUv - 0.5) * asp;
   float vig = 1.0 - uVignette * smoothstep(0.3, 1.25, length(vq));
   col *= vig;
-  // The shock front itself: a faint, irregular shell of ice-blue light, broken by a smooth noise
+  // The shock front itself: a faint, irregular shell of light, broken by a smooth noise
   // around the circle (48 cells, seamless; a hash of the direction grid drew rectangles where the
   // front is wide).
   if (shockEdge > 0.0) {
     float around = (atan(p.y, p.x) * 0.15915494 + 0.5) * 48.0;
     float cell = floor(around), fc = fract(around);
     float breakup = mix(hash11(mod(cell, 48.0)), hash11(mod(cell + 1.0, 48.0)), fc * fc * (3.0 - 2.0 * fc)) * 0.6 + 0.4;
-    col += vec3(0.5, 0.85, 1.0) * shockEdge * shockEdge * breakup * 0.05;
+    // Hot, blue-white on its inner edge; dispersed through a refracting front it reddens outward.
+    col += mix(vec3(0.55, 0.68, 1.0), vec3(1.0, 0.55, 0.3), shockSide) * shockEdge * shockEdge * breakup * 0.05;
   }
-  // Veiling glare from the blue-white star just outside the frame: a soft ice wash, no ghosts.
+  // Veiling glare from the sun-like star just outside the frame: a soft wash, no ghosts.
   if (uGlare.z > 0.0) {
     vec2 gd = (vUv - uGlare.xy) * asp;
-    col += vec3(0.62, 0.87, 1.0) * uGlare.z * (0.05 / (0.06 + dot(gd, gd)));
+    col += K_SUN * uGlare.z * (0.05 / (0.06 + dot(gd, gd)));
   }
   col *= uExposure;
-  // The impact's light: ice-white, concentrated at the singularity (the bloom spreads it); the
-  // blacks stay deep.
-  col += uFlash * vec3(0.85, 0.96, 1.0) * 1.3 * exp(-r * r * 60.0);
+  // The impact's light: hotter than anything after it — white with a breath of blue (~10 000 K) —
+  // concentrated at the singularity (the bloom spreads it); the blacks stay deep.
+  col += uFlash * mix(vec3(1.0), vec3(0.61, 0.7, 1.0), 0.35) * 1.3 * exp(-r * r * 60.0);
   vec3 lin = col;
   col = mix(shoulder(lin * 1.12), aces(lin * 1.35), uCurveMix);
   if (uHue > 0.0) col = mix(col, incandescent(lin * 1.25), uHue);
-  // Grade: cool the shadows a touch (less through the birth, whose deep blues are already
-  // saturated), keep highlights clean.
+  // Grade: cool the deepest shadows a breath (none through the birth's fire), keep highlights
+  // clean.
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col *= mix(mix(vec3(0.92, 0.99, 1.05), vec3(1.0), smoothstep(0.0, 0.5, l)), vec3(1.0), 0.6 * uHue);
+  col *= mix(mix(vec3(0.97, 0.985, 1.03), vec3(1.0), smoothstep(0.0, 0.4, l)), vec3(1.0), uHue);
   col = toSRGB(col);
   // Graduated filter over the lower band, applied to the light only (the background stays exact).
   col *= 1.0 - uScrim * pow(1.0 - smoothstep(uScrimBand.x, uScrimBand.y, vUv.y), 1.6);

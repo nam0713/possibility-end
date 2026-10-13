@@ -370,21 +370,26 @@ vec3 positionAt(vec4 s, vec4 c) {
   return p;
 }
 
-// The new universe's matter in the film's one hue family (ending-glsl.js PALETTE).
-const vec3 ICE = vec3(0.42, 0.80, 1.0);
-const vec3 COLD = vec3(0.82, 0.94, 1.0);
-const vec3 DEEP = P_DEEP;
-const vec3 GAS = vec3(0.16, 0.48, 1.0);
+// The new universe's matter, physically coloured (ending-glsl.js): thermal light by temperature
+// (blackbody), the gas and its web in survey / astrophotography colours.
+const vec3 ICE = vec3(0.41, 0.54, 1.0);   // the hottest field matter, ~20 000 K blue-white
+const vec3 COLD = vec3(1.0, 0.95, 0.92);  // ~6 000 K white
+const vec3 DEEP = vec3(0.6, 0.07, 0.0);   // cooled to a dull red glow (~1 100 K)
+const vec3 GAS = vec3(0.45, 0.5, 0.66);   // cold neutral gas: a dim blue-grey
+const vec3 NODE = vec3(1.0, 0.84, 0.64);  // dense nodes: old, yellowish starlight and hot gas
 
 // Colour (intensity included) and size factor of this particle at time t.
 // Before the impact: the reader's matter falling in.
 vec3 collapseLook(float t, float rad, out float size) {
   float u = clamp((t - hMeta.x) / (hMeta.y - hMeta.x), 0.0, 1.0);
   float heat = u * u;
-  // Falling matter accelerates and heats: ice → white-hot, brighter as it plunges.
-  vec3 hot = mix(vec3(0.55, 0.88, 1.0), vec3(0.85, 0.96, 1.0), heat);
-  // Settled matter glows by its orbit, like the disk: white-hot near the point, deep blue further out.
-  vec3 orbitCol = mix(P_HI, DEEP, smoothstep(0.35, 1.0, abs(hMeta.z)));
+  // Falling matter accelerates and heats (blackbody): orange → yellow → white, brighter as it
+  // plunges. The reader's far stars fall from furthest and are blueshifted as they fall.
+  vec3 hot = hMeta.z < 0.0 ? blackbody(mix(6500.0, 16000.0, heat)) : blackbody(mix(2200.0, 7000.0, heat));
+  // Settled matter glows by its orbit, like the disk (T ∝ r^-3/4): white-hot near the point,
+  // yellow, orange, a dull orange-red further out.
+  float ro = smoothstep(0.35, 1.0, abs(hMeta.z));
+  vec3 orbitCol = blackbody(6500.0 * pow(1.0 + 5.0 * ro, -0.75));
   float diskR = uC[0].x;
   // Each parcel keeps its light until it crosses into the disk, then gives it to the disk
   // (ending-core.js), so the swirl stays legible: space darkens because matter leaves it.
@@ -402,8 +407,8 @@ vec3 collapseLook(float t, float rad, out float size) {
 // After the impact: the new universe's matter.
 vec3 cosmosLook(float t, float g, out float size) {
   size = 1.0;
-  // Birth: sparks materialise out of the flash, white-hot, cooling through ice cyan to deep blue,
-  // then differentiating into fields (ice, cold white, deep blue).
+  // Birth: sparks materialise out of the flash, white-hot, cooling through yellow and orange to a
+  // dull red, then differentiating into fields (the hottest blue-white, white, a cooled red).
   float sp = aRnd.w;
   float age = t - IMPACT;
   vec3 hot = thermal(0.12 + 0.88 * uTemp + (sp - 0.5) * 0.12);
@@ -418,28 +423,35 @@ vec3 cosmosLook(float t, float g, out float size) {
   float c = clusterOf(g);
   float isNode = step(0.5, aWeb.w);
   float voidDim = mix(1.0, 0.3, step(aWeb.w, -0.5));
-  vec3 gasTint = mix(GAS, ICE, 0.35 + 0.4 * aRnd.z);
+  // The dark ages are a dim neutral grey; as gravity gathers the gas the filaments light a neutral
+  // blue (the cosmic web as surveys render it) and the nodes a yellowish white (voids stay dim).
+  float isVoid = step(aWeb.w, -0.5);
+  vec3 webTint = mix(mix(WEB, GAS, 0.25 + 0.4 * aRnd.z), mix(WEB, NODE, 0.7 + 0.3 * aRnd.z), isNode);
+  vec3 gasTint = mix(GAS, mix(webTint, GAS, isVoid), smoothstep(0.15, 0.85, c));
   // Dim while spread out, brightening as gravity gathers it: dark voids, legible knots.
   vec3 gas = gasTint * (0.14 + 0.82 * c + 0.08 * c * isNode) * (0.5 + aRnd.y) * voidDim;
   col = mix(col, gas, smoothstep(8.4, 11.0, t));
-  // Heavy elements from the first supernovae light the gas: it brightens and pales toward ice-white.
+  // Heavy elements from the first supernovae enrich the gas: it brightens and pales toward white,
+  // a touch of O-III teal in it.
   float enr = smoothstep(aStar.z, aStar.z + 2.4, t);
-  col = mix(col, P_HI * dot(col, vec3(0.45)), enr * 0.6);
+  col = mix(col, vec3(0.78, 0.92, 0.95) * dot(col, vec3(0.45)), enr * 0.5);
   // Stars.
   if (aStar.w != 0.0 && t > aStar.x) {
     float age = t - aStar.x;
     float ign = smoothstep(0.0, 0.18, age);
     float b = abs(aStar.w);
-    // The first generation burns blue-white; the second (enriched) a paler ice-white.
-    vec3 sc = aStar.w > 0.0 ? vec3(0.6, 0.86, 1.0) : vec3(0.88, 0.97, 1.0);
+    // The first generation (Population III: massive, metal-free, ~40 000 K) burns blue-white; the
+    // second (enriched, lighter) sun-like, a yellow-white.
+    vec3 sc = aStar.w > 0.0 ? mix(K_POP3, vec3(1.0), 0.25) : blackbody(5400.0);
     // Ignition: a short, bright flare (the first light of the first stars), then a steady glow.
     vec3 st = sc * b * (1.4 + 11.0 * exp(-age * 2.2)) * ign;
     float twinkle = 0.85 + 0.15 * sin(t * (2.0 + aRnd.z * 3.0) + aRnd.y * 6.28);
     st *= twinkle;
     if (t > aStar.y) {
       float sa = t - aStar.y;
-      // A supernova: a white-hot flash, then a slow deep-blue afterglow.
-      st = P_WHITE * b * 16.0 * exp(-sa * 2.6) + P_BLUE * b * 0.25 * exp(-sa * 0.5);
+      // A supernova: a blue-white flash (~15 000 K), then a slow afterglow — its remnant's H-alpha
+      // filaments (pink-red) around a faint O-III (teal) interior.
+      st = blackbody(15000.0) * b * 16.0 * exp(-sa * 2.6) + (H_ALPHA * 0.26 + O_III * 0.07) * b * exp(-sa * 0.5);
       size *= 1.0 + 1.5 * exp(-sa * 1.5);
     }
     col = col * 0.25 + st;

@@ -41,7 +41,7 @@ while (azF - az0 > Math.PI) azF -= Math.PI * 2;
 while (azF - az0 < -Math.PI) azF += Math.PI * 2;
 // “어느 평범한 은하”: first the whole galaxy, inclined, filling the frame as we close in with a
 // slow orbit; then a dive to its outskirts — down toward the disk, the arms resolving into
-// stars — onto the blue-white star. We come in from outside the star's orbit, looking inward.
+// stars — onto the sun-like star. We come in from outside the star's orbit, looking inward.
 const azTrack = createTrack([
   [STRUCTURE_END, az0], [21.6, az0 + 0.32], [23.0, SUN_AZIMUTH * 0.85], [24.6, SUN_AZIMUTH], [26.2, mix(SUN_AZIMUTH, azF, 0.65)], [28.8, azF],
 ]);

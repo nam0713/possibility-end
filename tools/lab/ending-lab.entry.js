@@ -30,6 +30,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { createEndingFilm } from '../../src/universe/ending-film.js';
+import { blackbody } from '../../src/universe/ending-math.js';
 
 const params = new URLSearchParams(location.search);
 const num = (k, d) => (params.has(k) ? Number(params.get(k)) : d);
@@ -69,6 +70,15 @@ const lin = h => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 2
 // The site's one cold palette (design/V9.1-FEEDBACK.md): accent, accent-hi, accent-deep, deepest, fg.
 const ICE = lin(0xa9e7f2), HI = lin(0xe6fbff), DEEP = lin(0x4f8fb0), DEEPEST = lin(0x1b3a52), WHITE = lin(0xeaf2f8);
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+// Amendment 2 (design/V9.1-FEEDBACK.md): the ch.8 seed is white-hot, as the engine draws it
+// (src/universe/config.js: core = the 5900 K blackbody bleached 45 % toward white, glow halo 5400 K,
+// outer halo 4800 K); ?seedHue=ice hands over the older ice seed instead (the film follows whatever
+// light it is given).
+const ICE_SEED = params.get('seedHue') === 'ice';
+const SEED_HI = ICE_SEED ? HI : mixc(blackbody(5900), [1, 1, 1], 0.45), SEED_TINT = ICE_SEED ? ICE : blackbody(5400);
+const SEED_HALO2 = ICE_SEED ? mixc(ICE, DEEP, 0.5) : blackbody(4800);
+const toSrgb = c => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+const SEED_SRGB = SEED_TINT.map(toSrgb);
 const unit = () => { const d = [gauss(), gauss(), gauss()]; const l = Math.hypot(...d) || 1; return d.map(v => v / l); };
 
 // The engine camera, composed like the engine's rig: the formation's framing radius R spans the
@@ -84,8 +94,8 @@ let focus = null;
 // handed over as `focusLight` like engine.js focusLight() (?light=0: the film's defaults).
 const DIM = scene === 'seed' ? 0.5 : 1;
 const LIGHT = [
-  { scale: 0.792, intensity: 0.85 * 1.4, core: HI, halo: ICE, breath: 0.26, rays: 0.3 },
-  { scale: 2.42, intensity: 0.14 * 1.6, core: [0, 0, 0], halo: mixc(ICE, DEEP, 0.5), breath: 0.1, rays: 0 },
+  { scale: 0.792, intensity: 0.85 * 1.4, core: SEED_HI, halo: SEED_TINT, breath: 0.26, rays: 0.3 },
+  { scale: 2.42, intensity: (ICE_SEED ? 0.14 : 0.1) * 1.6, core: [0, 0, 0], halo: SEED_HALO2, breath: 0.1, rays: 0 },
 ];
 const SEED = [0, 0, 0];
 if (scene === 'seed') {
@@ -116,13 +126,14 @@ if (scene === 'seed') {
     const v = unit();
     const r = Math.abs(gauss()) * 0.09 * (0.6 + 0.4 * rand());
     const heat = Math.exp(-r * 18);
-    put(i, v[0] * r, v[1] * r, v[2] * r, mixc(ICE, HI, 0.25 + 0.75 * heat), 0.008 + 0.022 * heat, 0.01);
+    put(i, v[0] * r, v[1] * r, v[2] * r, mixc(SEED_TINT, SEED_HI, 0.25 + 0.75 * heat), 0.008 + 0.022 * heat, 0.01);
   }
   // Corona: a wider, fainter glow of points.
   for (let k = quota(0.18); k > 0; k--, i++) {
     const v = unit();
     const r = 0.1 + Math.abs(gauss()) * 0.22;
-    put(i, v[0] * r, v[1] * r, v[2] * r, mixc(ICE, DEEP, rand() * 0.5), 0.012 + 0.016 * rand(), 0.011);
+    if (ICE_SEED) put(i, v[0] * r, v[1] * r, v[2] * r, mixc(ICE, DEEP, rand() * 0.5), 0.012 + 0.016 * rand(), 0.011);
+    else put(i, v[0] * r, v[1] * r, v[2] * r, SEED_TINT, (0.012 + 0.016 * rand()) * (1 - 0.35 * rand()), 0.011);
   }
   // Sparks: faint arcs on orbits within 50° of facing the camera (no bright heads: one light).
   const view = [0, Math.sin(pitch), Math.cos(pitch)];
@@ -142,7 +153,7 @@ if (scene === 'seed') {
     const n = [0, 1, 2].map(j => view[j] * z + (vu[j] * Math.cos(a) + vw[j] * Math.sin(a)) * sz);
     orbits.push([n, 0.3 + Math.pow(rand(), 1.4), rand() < 0.75 ? 1 : -1, rand() * 6.283, 0.5 + rand() * 1.4]);
   }
-  const tone = mixc(WHITE, ICE, 0.35);
+  const tone = ICE_SEED ? mixc(WHITE, ICE, 0.35) : mixc(WHITE, SEED_HI, 0.25);
   for (let k = quota(0.1); k > 0; k--, i++) {
     const [n, r, dir, a0, len] = orbits[k % 56];
     const [u, w] = basisOf(n);
@@ -257,7 +268,7 @@ function enginePreview() {
   const bloom = new UnrealBloomPass(new THREE.Vector2(W * pixelRatio, H * pixelRatio), 0.55, 0.08, 0.48);
   bloom.highPassUniforms.smoothWidth.value = 0.32;
   const finish = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uBg: { value: new THREE.Vector3(4 / 255, 7 / 255, 11 / 255) }, uLift: { value: new THREE.Vector3(0.663 * 0.018 + 0.004, 0.906 * 0.018 + 0.012, 0.949 * 0.018 + 0.022) }, uC: { value: new THREE.Vector2(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5) }, uAspect: { value: W / H }, uR: { value: tall ? 0.42 : 0.55 } },
+    uniforms: { tDiffuse: { value: null }, uBg: { value: new THREE.Vector3(4 / 255, 7 / 255, 11 / 255) }, uLift: { value: new THREE.Vector3(SEED_SRGB[0] * 0.018 + 0.004, SEED_SRGB[1] * 0.018 + 0.012, SEED_SRGB[2] * 0.018 + 0.022) }, uC: { value: new THREE.Vector2(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5) }, uAspect: { value: W / H }, uR: { value: tall ? 0.42 : 0.55 } },
     vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uBg, uLift; uniform vec2 uC; uniform float uAspect, uR; varying vec2 vUv;
       vec3 filmic(vec3 c) { c *= 1.12; vec3 m = 1.0 - exp(-c); float peak = max(c.r, max(c.g, c.b)); float top = max(m.r, max(m.g, m.b)); return mix(m, vec3(top), smoothstep(1.0, 5.0, peak) * 0.55); }

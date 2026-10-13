@@ -77,7 +77,8 @@ export function diskAngleRate(t) {
   return x > 0.035 ? k / (x * x) : 0;
 }
 
-// Core temperature of the newborn universe (0..1, see burn() / thermal()): white-hot at the
+// Core temperature of the newborn universe (heat index 0..1, see burn() / thermal(): blackbody
+// 800 K … 7 000 K): white-hot at the
 // impact, still hot once the bubbles have reheated it, then cooling adiabatically as it inflates.
 const temperatureTrack = createTrack([
   [IMPACT, 1.0], [4.3, 0.97], [5.4, 0.93], [5.75, 0.86], [6.05, 0.72], [6.6, 0.64], [7.6, 0.52], [8.6, 0.36], [9.8, 0.14], [11.5, 0.04],
@@ -131,7 +132,7 @@ export function createFrame() {
     parentSky: 0, skyPull: 0, newSky: 0,
     // world
     galaxy: 0, galaxyGlow: 0, galaxyStars: 1, sun: 0, sunBeacon: 0,
-    planet: 0, cool: 0, ocean: 0, clouds: 0, life: 0, atmo: 0,
+    planet: 0, cool: 0, steam: 0, ocean: 0, clouds: 0, life: 0, atmo: 0,
     // camera
     shake: 0,
     // post
@@ -147,9 +148,15 @@ export function createFrame() {
 const BG_PARENT = [4 / 255, 7 / 255, 11 / 255];
 const BG_VOID = [1.0 / 255, 1.8 / 255, 2.6 / 255];
 const BG_WORLD = [3 / 255, 6 / 255, 9 / 255];
-// The engine's background lift for the seed (its tint × 0.018 + base, display space): the seed's
-// tint is the theme colour, ice cyan #a9e7f2 (design/V9.1-FEEDBACK.md).
-const LIFT = [0.663 * 0.018 + 0.004, 0.906 * 0.018 + 0.012, 0.949 * 0.018 + 0.022];
+// The engine's background lift for the seed (its tint × 0.018 + base, display space). The tint is
+// the seed's (setSeedLift, from the handover's glow); default the white-hot seed's 5400 K glow.
+const LIFT = [0, 0, 0];
+/** Set the lift from the seed's display-space tint [r, g, b] (0..1) for this run. */
+export function setSeedLift(tint) {
+  const t = tint && tint.length >= 3 && tint.every(Number.isFinite) ? tint : [1.0, 0.925, 0.874];
+  LIFT[0] = t[0] * 0.018 + 0.004; LIFT[1] = t[1] * 0.018 + 0.012; LIFT[2] = t[2] * 0.018 + 0.022;
+}
+setSeedLift(null);
 
 /**
  * Fill `f` with every scalar of the film at time t.
@@ -191,7 +198,7 @@ export function sampleFrame(f, t, reduced) {
   if (t > IMPACT) core = (1.2 + 7.0 * Math.exp(-after / 0.05)) * Math.exp(-after / 0.5);
   f.core = core;
   f.coreSize = t <= IMPACT ? mix(0.008, 0.0045, fall) * (1 - 0.35 * inhale) * (1 + 0.28 * press) : 0.006 + 0.006 * (1 - Math.exp(-after * 5));
-  // The seed's ice tint, turning white-hot as the collapse nears the impact.
+  // The seed's own tint (as the engine hands it over), turning white-hot as the collapse nears the impact.
   f.coreTint = t <= IMPACT ? 1 - 0.65 * smoothstep(2.6, IMPACT, t) : 0;
   f.disk = smoothstep(1.1, 2.4, t) * (1 - smoothstep(3.5, IMPACT, t));
   f.diskRadius = diskRadius(t);
@@ -214,7 +221,7 @@ export function sampleFrame(f, t, reduced) {
   f.bubbleDone = smoothstep(5.35, 5.85, t);
   f.diff = smoothstep(6.4, 8.0, t);
   // “폭발적인 인플레이션 … 장과 입자들로 분화”: inside the plasma, a web of incandescent threads
-  // streaks past (inflation), thins, splits into deep-blue and pale ice strands, breaks into beads
+  // streaks past (inflation), thins and cools, splits into dull red and blue-white strands, breaks into beads
   // and dissolves.
   f.threads = smoothstep(THREADS_IN, THREADS_FULL, t) * (1 - smoothstep(8.8, 9.6, t)) * evalTrack(threadGainTrack, t);
   f.threadOpen = evalTrack(threadOpenTrack, t);
@@ -245,12 +252,15 @@ export function sampleFrame(f, t, reduced) {
   f.sun = smoothstep(21.6, 23.6, t);
   f.sunBeacon = smoothstep(21.8, 23.2, t) * (1 - smoothstep(24.6, 26.2, t));
   f.planet = smoothstep(24.6, 25.6, t);
-  // “작은 암석 행성 하나가 식어 갔다. 바다가 차오르고…” — the planet cools, oceans rise, clouds and life follow.
-  f.cool = smoothstep(25.6, 27.8, t);
-  f.ocean = smoothstep(26.6, 29.0, t);
-  f.clouds = smoothstep(27.4, 29.8, t);
-  f.life = smoothstep(28.6, 30.6, t);
-  f.atmo = smoothstep(26.8, 29.6, t);
+  // “작은 암석 행성 하나가 식어 갔다.” — molten (orange-yellow) while it is a point beside the star;
+  // a basalt crust closes over it, its fissures dimming to red, as we approach; steam veils it;
+  // seas rise into its basins and the steam breaks into weather; life follows.
+  f.cool = smoothstep(26.0, 27.6, t);
+  f.steam = smoothstep(27.2, 28.0, t) * (1 - smoothstep(28.4, 29.4, t));
+  f.ocean = smoothstep(27.5, 29.2, t);
+  f.clouds = smoothstep(28.0, 29.8, t);
+  f.life = smoothstep(29.2, 30.8, t);
+  f.atmo = smoothstep(26.9, 29.0, t);
 
   // ---- camera shake right after the impact
   f.shake = reduced ? 0 : pulse(t, IMPACT, 0.02, 0.32) * (t >= IMPACT ? 1 : 0);
@@ -271,10 +281,9 @@ export function sampleFrame(f, t, reduced) {
   f.grain = mix(0.022, 0.042, smoothstep(0.2, 2.0, t));
   // Tone curve: the engine's at the handover, the film's own once the collapse is under way.
   f.curveMix = smoothstep(0.15, 2.2, t);
-  // Through the birth a hue-preserving shoulder keeps the cold fire chromatic (white-hot core, ice
-  // cyan, deep blue) instead of greying; it lingers into the dark ages so the faint first haze keeps
-  // its blue.
-  f.hueCurve = smoothstep(3.56, 3.72, t) * (1 - smoothstep(10.4, 12.2, t));
+  // Through the birth a partly hue-preserving shoulder keeps the fire's orange and red from
+  // washing out, while (like film) its brightest parts still roll through yellow into white.
+  f.hueCurve = 0.45 * smoothstep(3.56, 3.72, t) * (1 - smoothstep(10.4, 12.2, t));
   // A graduated darkening of the lower band, where the UI sets its captions and controls: strongest
   // over the bright birth, lighter over the web, the galaxy and the final composition.
   f.scrim = smoothstep(0.3, 1.6, t) * (0.2 + 0.32 * smoothstep(3.56, 3.7, t) * (1 - smoothstep(8.8, 9.8, t)) + 0.1 * smoothstep(11.0, 13.0, t) * (1 - smoothstep(22.0, 24.0, t)));
@@ -284,7 +293,7 @@ export function sampleFrame(f, t, reduced) {
   const liftK = 1 - smoothstep(0.2, 1.8, t);
   f.lift[0] = LIFT[0] * liftK; f.lift[1] = LIFT[1] * liftK; f.lift[2] = LIFT[2] * liftK;
 
-  // ---- background: the parent universe darkens; the inside starts black; the new sky is deep blue
+  // ---- background: the parent universe darkens; the inside starts black; the new sky is a cold near-black
   const dark = smoothstep(0.6, 3.3, t);
   const toWorld = smoothstep(21.0, 27.0, t);
   for (let i = 0; i < 3; i++) {

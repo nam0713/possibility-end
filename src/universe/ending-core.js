@@ -1,7 +1,8 @@
 // The singularity: the reader's seed — the one light at the end of ch.8 — flaring when the
 // reader presses it and brightening as the old universe falls into it, with a thin,
-// Doppler-beamed accretion swirl in the collapse plane (white-hot inside, ice, then deep blue).
-// At the impact the seed becomes the white point the new universe expands from.
+// Doppler-beamed accretion swirl in the collapse plane (blackbody: white-hot inside, yellow,
+// orange, a dull red rim; the approaching side brighter and bluer). At the impact the seed becomes
+// the white point the new universe expands from.
 //
 // At the handover the seed's own glow is drawn exactly as the engine drew it (its glow
 // billboards: the handover's `focusLight`, or the engine's defaults), centred on the collapse point,
@@ -37,21 +38,25 @@ const CORE_FRAG = /* glsl */ `
 uniform float uIntensity;
 uniform float uTint;
 uniform float uTime;
+uniform vec3 uSeedCore;   // the seed's own core / halo tints (largest channel 1), from its glow
+uniform vec3 uSeedHalo;
 varying vec2 vP;
 varying float vEnergy;
 ${PALETTE}
 void main() {
   float r = length(vP);
-  // A soft, gradient-lit core (white-hot at the centre, ice outward) rather than a clipped disc:
+  // A soft, gradient-lit core (white at the centre, the seed's tint outward) rather than a clipped disc:
   // a smooth power-law profile whose peak stays near the tone curve's shoulder.
   float core = 1.0 / ((1.0 + r * r * 1.4) * (1.0 + r * r * 1.4));
   float halo = 0.12 / (1.0 + r * r * 1.2);
   float wide = 0.03 * exp(-r * 0.4);
-  // uTint: the seed's own ice tint as the engine drew it (1), turning white-hot toward the impact (0).
-  vec3 coreCol = mix(P_HI, P_WHITE, core);
-  vec3 col = mix(coreCol, mix(coreCol, P_ICE, 0.45), uTint) * core * 2.2
-           + mix(P_WHITE * 0.7, P_ICE * 0.9, uTint) * halo
-           + mix(P_BLUE, P_ICE * 0.6, uTint) * wide;
+  // uTint: the seed's own tint as the engine drew it (1). Toward the impact (0) everything falls
+  // in and the point heats past white: a white core in a faint blue-white (~12 000 K) glow.
+  vec3 hot = blackbody(12000.0);
+  vec3 coreCol = mix(mix(hot, vec3(1.0), core), mix(uSeedCore, vec3(1.0), core * 0.6), uTint);
+  vec3 col = mix(coreCol, mix(coreCol, uSeedHalo, 0.45), uTint) * core * 2.2
+           + mix(mix(hot, vec3(1.0), 0.5) * 0.7, uSeedHalo * 0.9, uTint) * halo
+           + mix(hot * 0.5, uSeedHalo * 0.6, uTint) * wide;
   // A faint, slow shimmer: the seed is alive, never a static dot.
   col *= 1.0 + 0.05 * sin(uTime * 7.0 + r * 0.8);
   col *= smoothstep(${CORE_EXTENT.toFixed(1)}, ${(CORE_EXTENT * 0.6).toFixed(1)}, r);
@@ -99,13 +104,20 @@ void main() {
 
 /**
  * The seed's glow when the handover carries none: the engine's two seed billboards
- * (accents/chapters.js SEED_GLOW and SEED_HALO), armed (the reader's pointer or focus is on it when
- * they press), at the brightness the reading layout shows them. World units, linear colours.
+ * (accents/chapters.js SEED_GLOW and SEED_HALO, amendment 2: a white-hot core — the 5900 K
+ * blackbody bleached toward white — in a 5400 K glow and a 4800 K outer halo), armed (the reader's
+ * pointer or focus is on it when they press), at the brightness the reading layout shows them.
+ * World units, linear colours.
  */
 export const DEFAULT_SEED_LIGHT = Object.freeze([
-  Object.freeze({ scale: 0.79, intensity: 0.6, core: [0.791, 0.965, 1.0], halo: [0.397, 0.799, 0.888], rays: 0.3 }),
-  Object.freeze({ scale: 2.42, intensity: 0.112, core: [0, 0, 0], halo: [0.2375, 0.537, 0.661], rays: 0 }),
+  Object.freeze({ scale: 0.79, intensity: 0.6, core: [1.0, 0.941, 0.919], halo: [1.0, 0.843, 0.731], rays: 0.3 }),
+  Object.freeze({ scale: 2.42, intensity: 0.08, core: [0, 0, 0], halo: [1.0, 0.773, 0.58], rays: 0 }),
 ]);
+// Tint of a linear colour, normalised so its largest channel is 1 (fallback when black/absent).
+const tintOf = (c, fallback) => {
+  const m = c ? Math.max(Number(c[0]) || 0, Number(c[1]) || 0, Number(c[2]) || 0) : 0;
+  return m > 1e-4 ? [c[0] / m, c[1] / m, c[2] / m] : fallback;
+};
 const SEED_GLOWS = 2;
 
 const DISK_VERT = /* glsl */ `
@@ -163,15 +175,20 @@ void main() {
   // Trailing lanes with dark gaps between them.
   float streaks = smoothstep(-0.25, 0.75, n);
   float ring = smoothstep(0.08, 0.24, r) * (1.0 - smoothstep(0.55, 1.0, r));
-  // Relativistic beaming: the side moving toward the camera is brighter.
+  // A thin accretion disk's temperature falls as r^-3/4 (Shakura–Sunyaev): white-hot at the inner
+  // edge (~7 500 K), yellow-white, orange, an ember-red rim (~1 650 K at r = 1). The brighter
+  // lanes run a little hotter.
+  float T = 7500.0 * pow(max(r, 0.13) / 0.13, -0.75) * (0.88 + 0.24 * streaks);
+  // Relativistic Doppler: the side orbiting toward the camera is blueshifted (hotter-looking) and
+  // beamed brighter (∝ δ³), the receding side redder and dimmer. Orbital speed ∝ r^-1/2.
   vec2 tangent = vec2(-sin(th), cos(th));
-  float beam = 1.0 + 0.7 * dot(tangent, uBeam);
-  // White-hot inside, ice through the middle, a saturated deep blue at the rim (no warm skirt).
-  vec3 inner = P_WHITE;
-  vec3 mid = P_ICE * 0.93;
-  vec3 outer = P_DEEP;
-  vec3 col = mix(inner * 1.8, mid, smoothstep(0.15, 0.45, r));
-  col = mix(col, outer, smoothstep(0.45, 0.9, r));
+  float beta = 0.42 * pow(max(r, 0.13) / 0.13, -0.5);
+  float delta = clamp(1.0 / (1.0 - beta * dot(tangent, uBeam)), 0.55, 1.7);
+  vec3 col = blackbody(T * delta);
+  // Surface brightness (a gentler stand-in for T⁴, so the outer disk still reads); the cooler
+  // outer disk keeps enough light to glow like embers rather than dim to brown.
+  col *= mix(1.8, 0.85, smoothstep(0.15, 0.45, r)) * mix(1.0, 0.45, smoothstep(0.45, 0.95, r));
+  float beam = delta * delta * delta;
   float e = ring * (0.25 + 0.75 * streaks) * streaks * beam * (1.0 + 2.5 * exp(-r * 7.0));
   gl_FragColor = vec4(col * e * uOpacity, 1.0);
 }
@@ -188,6 +205,8 @@ export function createCore() {
     uIntensity: { value: 1 },
     uTint: { value: 1 },
     uTime: { value: 0 },
+    uSeedCore: { value: new THREE.Vector3(1, 0.941, 0.919) },
+    uSeedHalo: { value: new THREE.Vector3(1, 0.843, 0.731) },
   };
   const coreMaterial = new THREE.ShaderMaterial({
     vertexShader: CORE_VERT, fragmentShader: CORE_FRAG, uniforms: coreUniforms,
@@ -248,6 +267,12 @@ export function createCore() {
       u.uHalo.value.fromArray(ok && L.halo ? L.halo : [0, 0, 0]);
       u.uRays.value = ok ? Number(L.rays) || 0 : 0;
     }
+    // The film's core sprite takes the seed's own tints (its first billboard), so the light that
+    // gathers out of the glow is the same colour as the glow.
+    const first = list.find(L => L && Number(L.intensity) > 0 && Number(L.scale) > 0) || DEFAULT_SEED_LIGHT[0];
+    const halo = tintOf(first.halo, [1, 0.843, 0.731]);
+    coreUniforms.uSeedHalo.value.fromArray(halo);
+    coreUniforms.uSeedCore.value.fromArray(tintOf(first.core, halo));
   }
   setLight(null, 0.09);
 

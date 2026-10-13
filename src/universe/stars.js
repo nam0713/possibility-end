@@ -3,7 +3,18 @@
 
 import * as THREE from 'three';
 import { starFragment, starVertex } from './particles/shaders.js';
-import { mulberry32, TAU } from './math.js';
+import { kelvinY, mulberry32, TAU } from './math.js';
+
+/**
+ * Stellar temperature (K) for two uniform deviates: the share of each class among stars bright
+ * enough to see — B blue-white 9 %, A white 17 %, F yellow-white 28 %, G yellow 28 %, K orange 14 %,
+ * M red 4 % (giants and nearby dwarfs).
+ */
+const CLASSES = [[0.09, 10000, 26000], [0.26, 7500, 10000], [0.54, 6000, 7500], [0.82, 5200, 6000], [0.96, 3800, 5200], [1, 2900, 3800]];
+export function starTemperature(a, b) {
+  for (const [p, lo, hi] of CLASSES) if (a < p) return lo * Math.pow(hi / lo, b);
+  return 6000;
+}
 
 export class Starfield {
   constructor(count) {
@@ -11,6 +22,7 @@ export class Starfield {
     const pos = new Float32Array(count * 3);
     const look = new Uint8Array(count * 4);
     const seeds = new Float32Array(count);
+    const tone = [0, 0, 0];
     for (let i = 0; i < count; i++) {
       const z = rng() * 2 - 1;
       const a = rng() * TAU;
@@ -22,14 +34,17 @@ export class Starfield {
       pos[i * 3 + 1] = z * band * r;
       pos[i * 3 + 2] = s * Math.sin(a) * r;
       const m = Math.pow(rng(), 5.5); // few bright stars
-      const tone = rng();
-      // Display-space colours, one hue family (~190–210°): mostly cold white, some ice cyan, a few
-      // deeper blue — varied in luminance and saturation, never in hue.
-      const [cr, cg, cb] = tone < 0.12 ? [0.66, 0.9, 0.95] : tone < 0.3 ? [0.6, 0.78, 0.9] : [0.9, 0.95, 0.97];
+      // A realistic spread of stellar temperatures (blackbody colour, equal luminance, a little
+      // desaturated as the eye sees stars): mostly white and pale yellow, some blue-white, a few
+      // orange and red.
+      const T = starTemperature(rng(), rng());
+      kelvinY(T, 0.78, tone);
       const lum = 0.22 + 0.78 * Math.pow(rng(), 2.2) * (0.4 + m);
-      look[i * 4] = Math.round(Math.min(1, cr * lum) * 255);
-      look[i * 4 + 1] = Math.round(Math.min(1, cg * lum) * 255);
-      look[i * 4 + 2] = Math.round(Math.min(1, cb * lum) * 255);
+      // Stored like display values (the shader squares them back to linear light).
+      const k = (lum * lum * 0.82) / Math.max(1, tone[0] * lum * lum * 0.82, tone[2] * lum * lum * 0.82);
+      look[i * 4] = Math.round(Math.sqrt(Math.min(1, tone[0] * k)) * 255);
+      look[i * 4 + 1] = Math.round(Math.sqrt(Math.min(1, tone[1] * k)) * 255);
+      look[i * 4 + 2] = Math.round(Math.sqrt(Math.min(1, tone[2] * k)) * 255);
       look[i * 4 + 3] = Math.round(m * 255);
       seeds[i] = rng();
     }

@@ -6,8 +6,9 @@ additions in `design/V9.1-FEEDBACK.md`). Source lives in `src/universe/` (ES mod
 including the ending film), which `npm run build` inlines into `index.html`. The lab at
 `/tools/lab/universe-lab.html` drives every API call.
 
-**v9.1 in short.** One cold hue family everywhere (no warm colour left in any formation, accent,
-starfield, grade or handover); `Universe.setScatter(v)` — the reading starfield the formation
+**v9.1 in short.** Physically motivated colour for the universe (amendment 2: ice/white structure,
+blackbody light for everything that emits, astrophotography colours for gas and dust; the UI keeps
+its single ice accent); `Universe.setScatter(v)` — the reading starfield the formation
 scatters into behind the body text and gathers back from; `Universe.ending.arm(bool)`; exactly one
 light at the end of ch.8, handed to the film as `focus` + `focusLight`.
 
@@ -17,7 +18,7 @@ light at the end of ch.8, handed to the film as `focus` + `focusLight`.
 |---|---|
 | `index.js` | `window.Universe`. Probes WebGL2 on the canvas before three touches it; every call is guarded (never throws); no-op API with well-formed returns when unavailable (`dataset.universe='none'`). In a worker scope the same bundle serves formation builds instead (see `formations/worker.js`). |
 | `engine.js` | Renderer, scene/layout state machine, on-demand rAF loop, resize/DPR, context loss, async program compile, prewarm, film handover snapshot. |
-| `config.js` | **Tuning knobs**: palette, quality tiers, adaptive steps, compositions, morph timings, easing, post, the reading starfield (`SCATTER`). |
+| `config.js` | **Tuning knobs**: colour (structure palette, emitter temperatures `K`), quality tiers, adaptive steps, compositions, morph timings, easing, post, the reading starfield (`SCATTER`). |
 | `particles/shaders.js` | Morph vertex shader (living motion, stagger, flow, DOF sprites, the reading starfield), the BAKE/GPU_STATE variants, star shaders, attribute packing constants. |
 | `particles/field.js` | The shared particle system: GPU attributes for both morph sides, morph clock, buffer swap, GPU bake + snapshot (float MRT targets), exact CPU mirror (scatter included) as fallback. |
 | `formations/*.js` | Cover, ch.1–8, `seed` (ending-ready), `origin` (load-in dust). `builder.js` = authoring API, sort + permutation; `index.js` = registry + LRU cache (worker requests or resumable main-thread jobs); `worker.js` = the build worker (both sides). |
@@ -29,19 +30,60 @@ light at the end of ch.8, handed to the film as `focus` + `focusLight`.
 | `quality.js` | Tier detection, GPU timer, adaptive controller. |
 | `film-host.js` | Engine side of the ending film contract (`ending-*.js` belong to the ending agent). |
 
-## Palette (v9.1: one theme colour)
+## Colour (v9.1 amendment 2: physically right)
 
-`config.js → HEX` holds only the palette of `design/V9.1-FEEDBACK.md` — space `#04070b`, fg `#eaf2f8`,
-ink `#dde6ed`, accent (ice cyan) `#a9e7f2`, accent-hi `#e6fbff`, accent-deep `#4f8fb0`, deepest
-`#1b3a52` — plus two mixes computed in linear light (`C.steel` = deep→white 15 %, `C.mist` =
-deepest→deep 50 %); every hue lies in ~189–211°. Formations vary luminance and saturation, never
-hue: what used to be ember (hot cores, chokepoints, factories, seeds) is now **white-hot**
-(accent-hi, brighter than its surroundings); what used to be "warm vs cold" is **bright/pale vs
-deep/saturated**. Tints for the background lift are deep/ice. The ch.5 star is blue-white (white-hot
-granules, ice-cyan lanes, limb darkening to deep blue), the ch.7 disc ice-white (white-hot rim, pale
-ice, deep-blue outskirts), the background stars cold white / ice / deep blue, the cover's selected
-node ice cyan. Verified on rendered frames: 0 pixels with R > B + 3 in every formation at 1440×900
-and 390×844, and in the reading starfield.
+The owner's second amendment to `design/V9.1-FEEDBACK.md` replaces the four-hue palette: colour in the
+three.js universe is physically motivated (the UI keeps its single ice accent). Three sources:
+
+- **Structure — ice / white / deep blue** (`config.js → HEX`: `ice #a9e7f2`, `iceHi #e6fbff`, `white #eaf2f8`,
+  `deep #4f8fb0`, `deepest #1b3a52`, + `C.steel`, `C.mist`). The abstract formations (cover ring, ch.1 loops,
+  ch.2 lattice, ch.3 conveyor, ch.4 crystal), the signals between the ch.6 minds, the last threads of matter.
+  This is what makes the UI's ice feel native to the universe.
+- **Heat — the blackbody.** Everything that emits takes the colour of its temperature, from a real
+  Kelvin → linear-sRGB function, never a hand-picked hex: `math.js kelvin(T, sat?)` integrates Planck's
+  law against the CIE 1931 2° colour-matching functions (Wyman–Sloan–Shirley multi-lobe fit, 5 nm steps),
+  converts XYZ → linear sRGB (D65), clips the out-of-gamut negatives of the reddest embers and normalises
+  the brightest channel to 1 (`kelvinY` normalises luminance instead; results cached per kelvin). It
+  matches the standard tables (1000 K `#ff2f00`, 3000 K `#ffb96e`, 6500 K `#fff9fe`, 10000 K `#cdd9ff`).
+  `math.js blackbodyGlsl()` is the same curve for shaders — `vec3 blackbody(float K)`, 32 entries on a
+  log-T grid 1000–40000 K — used where the temperature varies per fragment (granulation, Doppler shift).
+  `config.js → K` names the temperatures (`C.<name>` = `kelvin(K.<name>)`):
+
+  | K | kelvin | linear rgb | use |
+  |---|---|---|---|
+  | `ember` | 1800 | 1, .218, 0 | dull red embers (spare) |
+  | `cinder` | 2700 | 1, .423, .100 | spare (sparks run 2300–3600 K, dwarfs 2400–3300 K) |
+  | `orange` | 3900 | 1, .643, .355 | factory furnaces (ch.3) |
+  | `yellow` | 4800 | 1, .771, .579 | warm pulses (ch.1), products, chokepoint heat halos, the seed's corona and outer halo |
+  | `sun` | 5800 | 1, .882, .828 | coronas of cores, photosphere sparks, sunlit collectors |
+  | `hot` | 5900 | 1, .892, .852 | white-hot (slightly warm) |
+  | `whiteStar` / `blueStar` | 7200 / 12000 | | star classes |
+
+  `C.core` = `hot` bleached 45 % toward white `[1, .940, .919]` (`#fff8f6`): the heart of every white-hot
+  light (the seed, the singularities, ch.1/ch.2 cores) — a light far brighter than its surroundings
+  saturates toward white on film.
+- **Gas and dust — astrophotography.** `halpha #ec7f9c` (HII knots: H-alpha blended with H-beta reads pink),
+  `reflection #86a9de` (blue reflection, scattered light), `dust #5e5047` (brown-grey lanes), `web #7d8fb4`
+  (the cosmic web's neutral-blue haze). Mixes are computed in linear light.
+
+| scene | structure | what emits (thermal) / gas |
+|---|---|---|
+| cover | the ice ribbon, wisps, node orbit, nodes (selected ring = the UI's ice) | the singularity: white-hot `core` heart in a `sun` corona + glow; the inner spiral starts as cold blue gas and heats as it falls — 1700 K dull red → orange → white-hot near the core; outer halo: faint `deep`/`reflection` dust |
+| ch.1 intelligence | ice loops, cold-white threaded-loop nodes, glia | white-hot core (`core` in `sun`); great-loop nodes a barely warm white; the pulses along the links (particles and accent) 4800 K |
+| ch.2 computation | ice racks, blades, floors; data packets ice-white; aisle pulses ice | the jam heats: queue packets run ice → 1900 K → 6600 K white-hot at the gate; white-hot chokepoints (`core` glow in a 4800 K heat halo); the shared column white-hot; 8 % of status lights 4800 K |
+| ch.3 production | ice/white conveyor lanes, steel spine, deep-blue dependency loops | furnaces: clusters `orange`→`sun`, glows `sun` in `orange`; products 4800 K riding the lanes; sparks 2300–3600 K |
+| ch.4 matter | deep core → ice lattice → white tips; ice bonds; neutral-blue gas | only the seed emits: a small `sun` cluster in a `hot`/`yellow` glow |
+| ch.5 energy | the Dyson swarm: ice, sunlit warm-white near the star (`white`/`sun`), deep blue outward; radiators glint with reflected sunlight | the star (accent, per-fragment blackbody): photosphere `STAR_TEMP` 5000 K (5800 K reads plain white through the filmic shoulder; 5000 K is the yellow-white Sun of photographs), granules +~250 K, lanes −330 K, quadratic limb darkening (u₁ .47, u₂ .23) with the limb cooling to 0.7 T (orange edge), a thin H-alpha chromosphere, a pearly corona and faint halo (desaturated 5000 K); sparks white-hot; wind `sun` |
+| ch.6 distance | ice signal threads, neutral-blue intergalactic haze | *bright* = older, yellower: bulge 4300 K, arms 5300 K → 6400 K, brown-grey dust disc, glow 4300/4500 K · *deep* = younger, bluer: core 5000 K, arms 15000 → 22000 K, knots pink HII (`halpha`, 45 %) or blue-white young clusters (25000 K), dust lit blue · *faint*: an old dwarf, desaturated 5200–6200 K |
+| ch.7 universe | neutral-blue web remnants | the accretion disc, T = 7000 K·(r/r₀)^−¾ (white-hot inside → ~2700 K orange-red outside). Particles carry T(r); the disc surface (accent) is Doppler-shifted and beamed per fragment: δ = √(1−β²)/(1−β cosθ), β = 0.45·(r₀/r)^½, colour `blackbody(δT)`, light ×δ³ — the approaching side bluer and brighter. Photon ring `blackbody(7000 K·δ)`, lensed arcs `blackbody(0.72·7000 K·δ)`; 70 dull-red dwarfs 2400–3300 K; dead galaxies faint 3600 K starlight |
+| ch.8 possibility | four ice arms; inflow, shell | three arms of warm, pale old starlight (4600 K at 50 % saturation): a cool and a warm white; every arm whitens toward the seed and only the heart turns white-hot (`core`); the seed `sun` + `core` |
+| ending-ready | the last ice threads | **the one light**: a seething `sun` → `core` ball, a 4800 K corona, near-white arcs (`white` → `hot` 30 %); glow = `core` heart in a 5400 K halo + a wide faint 4800 K halo |
+| background stars | | a realistic spread of stellar temperatures (`stars.js starTemperature`): B 10–26 kK 9 %, A 7.5–10 kK 17 %, F 6–7.5 kK 28 %, G 5.2–6 kK 28 %, K 3.8–5.2 kK 14 %, M 2.9–3.8 kK 4 %; luminance-normalised, 78 % saturation |
+| reading starfield | | the same locus, calmer: tones `SCATTER.temps` 3400 / 5400 / 7400 / 15000 K at 80 % saturation, equal luminance, a per-star tone running piecewise between them (`SCATTER.tones` [0.12, 0.66]): a few orange, mostly yellow-white and white, some blue-white |
+
+The background lift behind each formation follows its `tint` (ch.5 and the seed `kelvinHex(4800)`,
+ch.7 `deepest`, the rest `deep`/`ice`). Post stays neutral: the filmic shoulder whitens only the
+brightest highlights (as film does), no stage adds a hue.
 
 ## Particle model
 
@@ -105,16 +147,16 @@ compiles anything.
 
 | scene | formation | reading (`setReading`) |
 |---|---|---|
-| cover | Möbius-like ribbon of 26 filaments (1.5 twists, the inner side whitening toward the centre) around a white-hot singularity in an ice-cyan corona; inner accretion spiral whitening as it falls; faint halo. Accent: node orbit with comets, 8 node sprites (ice-cyan ring on `select`), singularity glow. | — |
-| ch.1 | Recursive feedback: core → great loop with 5 nodes → threaded loops → tiny loops; each level turns faster. Pulses stream along links. Accent: links whose pulses accelerate over a 12 s cycle and with reading. | pulses speed up |
-| ch.2 | Three datacenter floors of racks as point lattices, status lights (a few white-hot), packets down the aisles queueing — brightening as they near it — at a white-hot chokepoint (the floor's brightest light), one shared column (one rack slot is empty). Accent: lattice hairlines, aisle pulses that step and wait, chokepoint glows. | — |
-| ch.3 | Trefoil knot with five conveyor lanes streaming along it, "products", six white-hot factories with deeper ice-cyan dependency loops. Accent: spine with flowing light, factory glows. | the open last stretch fills in: **the loop closes** |
-| ch.4 | Dendritic crystal (octahedral core, six arms, fishbone branches), atoms = nucleus + shell (white-hot near the seed, cooling to ice outward), loose matter falling onto the growth front, white-hot seed. Accent: bonds, seed glow. | grows outward from the seed |
-| ch.5 | Blue-white granulated star (accent sphere + corona) wrapped by a Dyson swarm: 84 rings in 7 inclined families (white-hot near the star, ice/deep outward) + free collectors (Keplerian speeds), glinting radiators, a pale wind. | the swarm fills in |
-| ch.6 | Two spiral galaxies told apart by luminance, saturation and structure — *bright*: a tight two-armed grand design with a large white-hot bulge, pale; *deep*: three loose arms beaded with saturated ice-cyan knots fading to deep blue, a small core, dimmer — plus a small steel third, each rotating; signal threads in their sender's light. Accent: thread pulses, core glows. | galaxies drift apart (threads fall short) |
-| ch.7 | Black hole (horizon re-drawn after bloom, ice-white Doppler-beamed disc, lensed arcs + photon ring), 70 dim deep-blue cinders, receding cosmic-web remnants, dead galaxies (deep behind the hole, inside the framing circle on screen). | disc evaporates, light dims, space expands, horizon shrinks |
-| ch.8 | Seven logarithmic filament arms streaming along their own tangents into a fragile seed, brightening and whitening as they near it; falling outer shell. Accent: flickering seed glow. | everything draws tighter |
-| ending-ready | **Exactly one light** (see below): a seething white-hot core in an ice-cyan corona, faint spark arcs (no bright heads) on orbits that never turn edge-on, spiral infall. Accent: breathing seed glow with soft rays + a wide halo, brighter and breathing deeper while armed. | — |
+| cover | Möbius-like ice ribbon of 26 filaments (1.5 twists, the inner side whitening toward the centre) around a white-hot singularity; an inner accretion spiral heating along the blackbody as it falls (cold blue gas → dull red → white-hot); faint blue halo dust. Accent: node orbit with comets, 8 node sprites (ice-cyan ring on `select`), white-hot singularity glow. | — |
+| ch.1 | Recursive feedback: core → great loop with 5 nodes → threaded loops → tiny loops (ice); each level turns faster. Warm (4800 K) pulses stream along links from a white-hot core. Accent: ice links whose warm pulses accelerate over a 12 s cycle and with reading. | pulses speed up |
+| ch.2 | Three datacenter floors of ice racks as point lattices, status lights (a few warm), ice-white packets down the aisles queueing — heating along the blackbody as they jam — at a white-hot chokepoint (the floor's brightest light), one shared white-hot column (one rack slot is empty). Accent: lattice hairlines, ice aisle pulses that step and wait, white-hot chokepoint glows in a warm heat halo. | — |
+| ch.3 | Trefoil knot with five ice conveyor lanes streaming along it, warm "products", six furnace-hot factories (orange round a white heart, orange sparks) with deep-blue dependency loops. Accent: spine with flowing light, furnace glows. | the open last stretch fills in: **the loop closes** |
+| ch.4 | Dendritic crystal (octahedral core, six arms, fishbone branches), atoms = nucleus + shell (deep blue near the seed, ice in the lattice, white at the growing tips), loose matter falling onto the growth front, a small warm seed, neutral-blue gas. Accent: ice bonds, warm seed glow. | grows outward from the seed |
+| ch.5 | Sun-like granulated star (accent sphere, per-fragment blackbody: hot granules, cooler lanes, limb darkening toward orange, H-alpha chromosphere; pearly corona and halo) wrapped by an ice Dyson swarm: 84 rings in 7 inclined families (sunlit warm white near the star, ice/deep outward) + free collectors (Keplerian speeds), radiators glinting with reflected sunlight, white-hot photosphere sparks, a faint wind. | the swarm fills in |
+| ch.6 | Two minds in two lights — *bright* (older, yellower): a tight two-armed grand design with a large yellowish bulge and brown-grey dust; *deep* (younger, bluer): three loose blue-white arms beaded with pink HII knots and blue-white young clusters round a small yellowish core, far — plus a small old dwarf, each rotating; ice signal threads between them. Accent: ice thread pulses, core glows in their stars' light. | galaxies drift apart (threads fall short) |
+| ch.7 | Black hole (horizon re-drawn after bloom, a blackbody disc, white-hot inside to orange-red outside, Doppler-shifted and beamed — lensed arcs + a white-hot photon ring), 70 dull-red dwarfs, receding cosmic-web remnants in a neutral-blue haze, faint old reddened dead galaxies (deep behind the hole, inside the framing circle on screen). | disc evaporates, light dims, space expands, horizon shrinks |
+| ch.8 | Seven logarithmic filament arms (four ice, three of pale warm starlight) streaming along their own tangents into a fragile white-hot seed, brightening and whitening as they near it, white-hot only at the heart; falling outer shell. Accent: flickering white-hot seed glow. | everything draws tighter |
+| ending-ready | **Exactly one light** (see below): a seething white-hot core in a warmer 4800 K corona, faint near-white spark arcs (no bright heads) on orbits that never turn edge-on, ice spiral infall. Accent: breathing white-hot seed glow with soft rays + a wide, faint warm halo, brighter and breathing deeper while armed. | — |
 
 ## Reading starfield — `Universe.setScatter(v)`
 
@@ -133,8 +175,8 @@ formation, and stays put on screen while the composition eases; the remaining (c
 sway move near and far stars differently, which reads as depth. Only `density` stars per CSS
 megapixel stay visible (1490 at 1440×900, the 420 minimum on phones), as a share of the *drawn*
 particles: the tier's count and the adaptive draw range are compensated, so every tier shows the same
-field. Magnitudes are `rand^steep` (a few bright stars), colours cold white / ice / accent-hi with
-faint far stars leaning deep blue; sprites are fixed-size Gaussians (`px`…`pxBright` CSS px, σ ≈
+field. Magnitudes are `rand^steep` (a few bright stars), colours real stellar temperatures along the blackbody
+(`SCATTER.temps`/`tones`/`saturation`: a few orange, mostly yellow-white and white, some blue-white, at equal luminance and 80 % saturation); sprites are fixed-size Gaussians (`px`…`pxBright` CSS px, σ ≈
 px/6.5) — wide enough that sub-pixel drift never flickers, crisp enough to read as points. They pan
 slowly leftward (nearer stars faster: 1…`drift` cycles per 20-min clock period, so the wrap is
 seamless), twinkle subtly, and on wide screens stars behind the text column keep `calm` of their
@@ -236,7 +278,11 @@ faint with no bright heads, and their orbit planes stay within 50° of facing th
 can then bunch at most ~1.6×). Verified on the real site with the HTML trigger hidden, 8 frames over
 6 s each at 1440×900, 390×844, 320×568 and 844×390: exactly one blob ≥ 95/255, centred 0.6–0.9 px
 from the anchor (the half-pixel centre convention); no point-like peak within 120 px of it (the only
-other local peaks are sky stars ≥ 190 px away). Armed, the same holds.
+other local peaks are sky stars ≥ 190 px away). Armed, the same holds. Re-verified with the
+white-gold seed (the former four-hue palette), UI hidden, 4 frames over ~5 s at 1440×900, 390×844 and 320×568:
+one blob ≥ 95/255 of ≥ 3 px, its centroid ≤ 0.7 px from the anchor; only isolated single pixels
+elsewhere (sky stars, arc pixels). The spark arcs are dimmed where they ride on the glow's bright
+floor (r < 0.8, `seed.js`), so no arc fragment crosses into a light of its own at the glow's edge.
 
 **`Universe.ending.arm(bool)`** (hover/focus on the trigger): the ready seed's glow brightens (×1.4),
 grows (×1.1), its halo ×1.6 and its breath deepens, eased (`EASE.arm` 0.32 s). Only the seed accent
@@ -249,8 +295,8 @@ the buffer (tier `bloomScale` × adaptive step) with a soft knee and small radiu
 RenderPass re-draws the ch.7 horizon (and the disc band in front of it) *after* bloom so glow never
 leaks into the shadow. FinishPass (an OutputPass with a replaced shader) applies an exponential filmic
 shoulder with highlight desaturation, sRGB, then composes the `#04070b` background in display space
-(exact colour, faint cold-tinted lift behind the formation), vignette, veil dimming, fades and grain.
-No stage adds a hue: the grade is neutral, every input colour is in the palette's family.
+(exact colour, a faint lift behind the formation tinted by its `tint`), vignette, veil dimming, fades
+and grain. No stage adds a hue: the grade is neutral; colour comes from the inputs (structure, blackbody, gas — see Colour).
 
 ## Loop & performance
 
@@ -326,6 +372,14 @@ sees exactly the same picture. The handover carries
   `accents/materials.js glowFragment` (`SEED_GLOW` / `SEED_HALO` in `accents/chapters.js`). An armed
   seed hands over its armed brightness. The film declares `handover = { energies, focus, focusLight }`
   and, measured on the real site, its first ~1.4 s keep exactly one light on the anchor (≤ 0.8 px).
+  **Seed colour (physical, amendment 2):** the ready seed's `glows` are
+  `[{ core: C.core [1, 0.9403, 0.9187], halo: kelvin(5400) [1, 0.8409, 0.7300], scale 0.72, intensity
+  0.85, breath 0.16, rays 0.3 }, { core: [0, 0, 0], halo: C.yellow = kelvin(4800) [1, 0.7709, 0.5792],
+  scale 2.2, intensity 0.085, breath 0.1 }]` (linear rgb; unarmed values, × presence): a white-hot,
+  slightly warm white heart in a warmer halo. The seed's particles (`colors`) run `sun` (5800 K) →
+  `core`, its corona 4800 K, its arcs a near-white (`white` → `hot` 30 %), its last threads ice.
+  Re-verified on the real site (GPU, 1440×900 and 390×844, UI visible): exactly one blob ≥ 95/255 (the
+  seed, centred above the trigger); every other pixel that bright belongs to the trigger's text.
 
 The engine owns the rAF loop and calls `film.update/render`, emits `universe:ending-phase` (index, key,
 time) and `universe:ending-finished`. `stop()` fades to black over 0.6 s (overlay quad after the film),

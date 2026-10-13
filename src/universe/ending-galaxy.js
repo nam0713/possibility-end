@@ -1,13 +1,13 @@
-// “어느 평범한 은하” — one ordinary spiral galaxy grown from the hero node:
-// a star-particle disk (a white-ice bulge, young ice-blue arms with bright cyan-white
-// star-forming knots, a dim inter-arm field, slow differential rotation) over a procedural
-// diffuse-light disk (arms, dark blue-grey dust lanes on their inner edges, a smooth bulge).
-// All in the film's one cold hue family (ending-glsl.js PALETTE).
+// “어느 평범한 은하” — one ordinary spiral galaxy grown from the hero node, coloured as galaxies
+// photograph: a star-particle disk (a yellowish bulge of old stars, blue-white young arms with
+// pink HII knots, a dim white-to-yellow inter-arm field, slow differential rotation; star colours
+// by blackbody temperature) over a procedural diffuse-light disk (arms, brown-grey dust lanes on
+// their inner edges, a smooth bulge).
 // Seen first whole, inclined; then the camera dives to its outskirts and the arms
 // resolve into stars streaming past.
 import * as THREE from 'three';
 import { PALETTE, SIMPLEX } from './ending-glsl.js';
-import { gauss } from './ending-math.js';
+import { blackbody, gauss } from './ending-math.js';
 import { GAL_E1, GALAXY_NORMAL, GALAXY_RADIUS, HERO } from './ending-layout.js';
 
 const ARM_PITCH = 0.34; // tan of the spiral pitch angle (≈ 19°)
@@ -85,23 +85,24 @@ void main() {
   // Dust lanes run along the inner (concave) edge of each arm, broken into patches.
   float lane = pow(0.5 + 0.5 * cos(phase + 0.6), 7.0) * smoothstep(0.1, 0.24, r) * smoothstep(1.0, 0.35, r)
              * smoothstep(0.25, 0.65, n);
-  // Star clouds, and (the brightest of them) cyan-white star-forming knots.
+  // Star clouds, and (the brightest of them) pink HII knots (star-forming regions: H-alpha).
   float fine = snoise(vec3(pr * 30.0, 4.1)) * 0.5 + 0.5;
   float clumps = smoothstep(0.55, 0.95, fine);
   float hii = smoothstep(0.86, 0.99, fine) * arm;
   float disk = exp(-r / ${(DISK_SCALE * 0.82).toFixed(3)}) * smoothstep(1.3, 0.85, r);
   float halo = exp(-r / 0.55) * 0.08;
   float bulge = exp(-pow(r / 0.07, 0.9)) + 0.2 * exp(-r / 0.14);
-  // A white-ice bulge, ice-blue arms, bright cyan-white knots.
-  vec3 core = P_HI * 0.86;
-  vec3 cool = vec3(0.5, 0.8, 1.0);
-  vec3 knot = vec3(0.68, 0.94, 1.0);
+  // As galaxies photograph: a yellowish bulge of old stars (~4 200 K), blue arms of young stars
+  // (~11 000 K) with blue reflection haze, pink HII knots (H-alpha with a little H-beta).
+  vec3 core = mix(K_BULGE, vec3(1.0, 0.9, 0.78), 0.5) * 0.9;
+  vec3 cool = mix(K_YOUNG, REFLECTION, 0.25);
+  vec3 knot = mix(H_ALPHA, vec3(1.0, 0.4, 0.6), 0.35);
   vec3 col = core * bulge * 1.3;
   col += mix(core * 0.5, cool, smoothstep(0.08, 0.42, r)) * (disk * (0.12 + 1.3 * (arm + spur) * (0.55 + 0.6 * n)) + halo);
   col += cool * clumps * (arm + spur) * disk * 0.9;
-  col += knot * hii * disk * 1.05;
-  // Dust lanes swallow the paler light first: dark, blue-grey.
-  col *= mix(vec3(1.0), vec3(0.34, 0.41, 0.47), lane);
+  col += knot * hii * disk * 1.5;
+  // Dust lanes absorb blue light first: brown-grey, reddening what shines through.
+  col *= mix(vec3(1.0), DUST_LANE * 0.55, lane);
   // A thin disk seen at a grazing angle is brighter (a longer path through it): from near the
   // plane it gathers toward the band across the sky.
   float dist = length(vView);
@@ -144,22 +145,24 @@ export function sampleGalaxyStar(rand, out) {
 /** Fill star orbits and colours for indices [i0, i1) (resumable: see ending-film.js). */
 export function fillGalaxyStars(rand, orbit, color, i0, i1) {
   const star = { r: 0, ang: 0, h: 0, kind: 0 };
+  const tint = [0, 0, 0];
   for (let i = i0; i < i1; i++) {
     sampleGalaxyStar(rand, star);
     let bright, c0, c1, c2;
     if (star.kind === 0) {
-      // Bulge: old, dense and white-ice.
+      // Bulge: old, dense, yellowish (K and G giants, ~3 800–5 200 K).
       bright = (0.3 + rand() * 0.45) * 0.85;
-      c0 = 0.84; c1 = 0.95; c2 = 1.0;
+      blackbody(3800 + rand() * 1400, tint);
+      c0 = tint[0]; c1 = tint[1]; c2 = tint[2];
     } else {
-      // Disk: young ice-blue stars light the arms; the older field is pale and dim.
+      // Disk: young, hot O/B/A stars (9 000–25 000 K) light the arms blue-white; the older field
+      // (F/G/K, 4 500–7 500 K) is white to yellowish and dim.
       const young = star.kind === 1 && rand() < 0.45;
       bright = young ? 0.32 + Math.pow(rand(), 4) * 2.4 : 0.1 + rand() * 0.22;
-      if (young) { c0 = 0.55; c1 = 0.82; c2 = 1.0; }
-      else if (rand() < 0.5) { c0 = 0.84; c1 = 0.93; c2 = 1.0; }
-      else { c0 = 0.72; c1 = 0.87; c2 = 1.0; }
-      // Star-forming knots: bright cyan-white.
-      if (young && rand() < 0.06) { c0 = 0.68; c1 = 0.94; c2 = 1.0; bright *= 1.3; }
+      blackbody(young ? 9000 + Math.pow(rand(), 2) * 16000 : 4500 + rand() * 3000, tint);
+      c0 = tint[0]; c1 = tint[1]; c2 = tint[2];
+      // Star-forming knots: pink (their glowing hydrogen).
+      if (young && rand() < 0.06) { c0 = 1.0; c1 = 0.36; c2 = 0.5; bright *= 1.3; }
     }
     orbit[i * 4] = star.r; orbit[i * 4 + 1] = star.ang; orbit[i * 4 + 2] = star.h; orbit[i * 4 + 3] = bright;
     color[i * 3] = c0; color[i * 3 + 1] = c1; color[i * 3 + 2] = c2;

@@ -1,10 +1,12 @@
 // Ch.8 허용된 것들의 끝 POSSIBILITY — everything gathers toward one point: seven logarithmic
 // filaments spiral inward and stream into a fragile, flickering seed; a faint outer shell of
-// remaining matter falls in radially. The matter brightens and whitens as it nears the seed
-// (luminance, never hue). Reading draws it all tighter.
+// remaining matter falls in radially. Four arms are ice (structure); three carry the warm, pale light
+// of old starlight (a desaturated 4600 K) — a cool and a warm white. All of them brighten and whiten as
+// they near the seed, and only at the very heart turn white-hot — the seed's light.
+// Reading draws it all tighter.
 
 import { C, HEX } from '../config.js';
-import { TAU, basisFromNormal } from '../math.js';
+import { TAU, basisFromNormal, kelvin } from '../math.js';
 import { cluster, mix, unitVector } from './common.js';
 
 const nrm = (x, y, z) => {
@@ -36,6 +38,7 @@ export default {
 
     // Spiral filaments: thin and luminous, streaming inward; each arm is a bundle of strands.
     const arms = b.quota(0.62);
+    const starlight = kelvin(4600, 0.5);
     for (let k = 0; k < arms; k++) {
       if (b.tick()) yield;
       const arm = k % VORTEX.arms;
@@ -50,8 +53,11 @@ export default {
       const y = (basis[1] * ca + basis[4] * sa) * r + n[1] * h;
       const z = (basis[2] * ca + basis[5] * sa) * r + n[2] * h;
       const heat = Math.pow(1 - t, 2.4);
-      const col = mix(mix(C.white, C.ice, 0.45 * t), C.iceHi, heat * 0.9);
-      const i = b.point(x, y, z, col, (0.16 + 0.14 * b.rng()) * (0.45 + 1.1 * heat) * (1.15 - 0.7 * t), 0.0075 + 0.005 * b.rng());
+      const base = arm % 2 ? mix(starlight, C.white, 0.25 * (1 - t)) : mix(C.white, C.ice, 0.35 + 0.4 * t);
+      const col = mix(mix(base, C.white, heat * 0.85), C.core, heat * heat * heat);
+      // The warm arms: lit a little more, so both whites read as strongly.
+      const lift = arm % 2 ? 1.1 : 1;
+      const i = b.point(x, y, z, col, (0.16 + 0.14 * b.rng()) * (0.45 + 1.1 * heat) * (1.15 - 0.7 * t) * lift, 0.0075 + 0.005 * b.rng());
       // Inward travel along the arm's own tangent (dθ/dr = k/r), plus one rigid rotation so the
       // arms never wind up over time.
       const kw = 0.42 / Math.tan(pitch);
@@ -84,8 +90,8 @@ export default {
       b.flow(i, -v[0] * r * 0.4, -v[1] * r * 0.32, -v[2] * r * 0.4, 0.04 + 0.03 * b.rng());
     }
 
-    // The seed: small, bright, fragile.
-    cluster(b, b.quota(0.014), 0, 0, 0, 0.04, C.ice, 0.3, 0.012, { falloff: 1.5, spin: 1.2, twinkle: 0.8 });
-    cluster(b, b.quota(0.004), 0, 0, 0, 0.012, C.iceHi, 0.7, 0.012, { spin: 1.6, twinkle: 0.5 });
+    // The seed: small, bright, fragile — white-hot.
+    cluster(b, b.quota(0.014), 0, 0, 0, 0.04, C.sun, 0.3, 0.012, { falloff: 1.5, spin: 1.2, twinkle: 0.8 });
+    cluster(b, b.quota(0.004), 0, 0, 0, 0.012, C.core, 0.7, 0.012, { spin: 1.6, twinkle: 0.5 });
   },
 };

@@ -1,6 +1,8 @@
 // 'ending-ready' — the bright seed waiting at the end of ch.8: nearly all matter condensed into a
-// small, seething, white-hot core in an ice-cyan corona; faint arcs of sparks orbit it; the last
-// threads of matter fall in. Plus 'origin': the scattered dust the site loads in from.
+// small, seething, white-hot core (a slightly warm white: the 5900 K blackbody bleached by its own
+// brightness) in a warmer, cooler-burning corona (4800 K); faint near-white arcs of sparks orbit it;
+// the last ice threads of matter fall in. The seed reads as one white-hot light. Plus 'origin': the
+// scattered dust the site loads in from.
 //
 // Exactly ONE light (design/V9.1-FEEDBACK.md 3): everything bright is concentric with the core at the
 // formation's centre (= its focus = the anchor the UI rests the trigger on). Nothing else may read as
@@ -10,7 +12,7 @@
 //     (the second "white dot" of v9), a face-on one cannot bunch more than ~1.6×;
 //   - the corona and the core are radially symmetric about the centre.
 
-import { C, HEX } from '../config.js';
+import { C, HEX, K, kelvinHex } from '../config.js';
 import { TAU, basisFromNormal } from '../math.js';
 import { keep, mix, unitVector } from './common.js';
 
@@ -26,7 +28,7 @@ export const seed = {
   radius: 1.9,
   center: [0, 0, 0],
   view: VIEW,
-  tint: HEX.ice,
+  tint: kelvinHex(K.yellow),
   morph: 'seed',
   reading: { preview: 1 },
   // The end of ch.8 waits in the 'reading' composition: the seed stays small and central there (the
@@ -41,16 +43,16 @@ export const seed = {
       unitVector(b, v);
       const r = Math.abs(b.gauss()) * 0.09 * (0.6 + 0.4 * b.rng());
       const heat = Math.exp(-r * 18);
-      const i = b.point(v[0] * r, v[1] * r, v[2] * r, mix(C.ice, C.iceHi, 0.25 + 0.75 * heat), 0.008 + 0.022 * heat, 0.01);
+      const i = b.point(v[0] * r, v[1] * r, v[2] * r, mix(C.sun, C.core, 0.25 + 0.75 * heat), 0.008 + 0.022 * heat, 0.01);
       b.orbit(i, b.rng() - 0.5, b.rng() - 0.5, b.rng() - 0.5, 0.4 + 1.2 * b.rng());
     }
-    // Corona of the seed: a wider, fainter glow of points.
+    // Corona of the seed: a wider, fainter glow of warmer (cooler-burning) points.
     const corona = b.quota(0.18);
     for (let k = 0; k < corona; k++) {
       if (b.tick()) yield;
       unitVector(b, v);
       const r = 0.1 + Math.abs(b.gauss()) * 0.22;
-      const i = b.point(v[0] * r, v[1] * r, v[2] * r, mix(C.ice, C.deep, b.rng() * 0.5), 0.012 + 0.016 * b.rng(), 0.011);
+      const i = b.point(v[0] * r, v[1] * r, v[2] * r, C.yellow, (0.01 + 0.012 * b.rng()) * (1 - 0.35 * b.rng()), 0.011);
       b.orbit(i, v[2], 1, -v[0], 0.3 + 0.5 * b.rng());
       b.twinkle(i, 0.5);
     }
@@ -74,7 +76,7 @@ export const seed = {
       orbits.push([nx, ny, nz, r, b.rng() < 0.75 ? 1 : -1, b.rng() * TAU, 0.5 + b.rng() * 1.4]);
     }
     const arc = new Float64Array(6);
-    const tone = keep(C.white, C.ice, 0.35);
+    const tone = keep(C.white, C.hot, 0.3);
     for (let k = 0; k < sparks; k++) {
       if (b.tick()) yield;
       const [nx, ny, nz, r, dir, a0, len] = orbits[k % orbits.length];
@@ -84,7 +86,11 @@ export const seed = {
       const a = a0 - dir * f * len;
       const ca = Math.cos(a) * r, sa = Math.sin(a) * r;
       const lead = Math.pow(1 - f, 1.4);
-      const i = b.point(arc[0] * ca + arc[3] * sa, arc[1] * ca + arc[4] * sa, arc[2] * ca + arc[5] * sa, mix(tone, C.deep, 0.35 * (r - 0.3)), (0.012 + 0.05 * lead) * (1.2 - r * 0.4), 0.008 + 0.003 * lead);
+      // Arcs close to the core ride on the glow's bright floor: they are dimmed there, so no fragment
+      // of an arc ever crosses into a light of its own at the glow's edge.
+      const sm = Math.min(1, Math.max(0, (r - 0.35) / 0.45));
+      const inner = 0.25 + 0.75 * sm * sm * (3 - 2 * sm);
+      const i = b.point(arc[0] * ca + arc[3] * sa, arc[1] * ca + arc[4] * sa, arc[2] * ca + arc[5] * sa, tone, (0.012 + 0.05 * lead) * (1.2 - r * 0.4) * (0.78 - 0.3 * (r - 0.3)) * inner, 0.008 + 0.003 * lead);
       b.orbit(i, nx, ny, nz, (dir * 0.32) / Math.pow(r, 1.5));
       b.twinkle(i, 0.3);
     }

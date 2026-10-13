@@ -1,11 +1,12 @@
 // Ch.2 컴퓨터 COMPUTATION — a crystalline compute lattice: three stacked datacenter floors of
-// racks drawn as precise point lattices, status lights, and data packets running down the aisles
-// toward a single white-hot chokepoint per floor (the brightest light of each floor: luminance marks
-// the bottleneck), where they queue and crawl upward through one shared column. Waiting for GPUs,
-// power, buildings.
+// racks drawn as precise point lattices (ice), status lights, and ice-white data packets running down
+// the aisles toward a single white-hot chokepoint per floor (the brightest light of each floor marks
+// the bottleneck), where they jam and heat — along the blackbody, dull red → orange → white-hot as they
+// near the gate — and crawl upward through one shared white-hot column. Waiting for GPUs, power,
+// buildings. Structure and data are cold; only the congestion glows.
 
 import { C, HEX } from '../config.js';
-import { TAU, eulerMatrix } from '../math.js';
+import { TAU, eulerMatrix, kelvin, smoothstep } from '../math.js';
 import { mix, transform } from './common.js';
 
 export const LATTICE = {
@@ -98,7 +99,7 @@ export default {
       const hot = b.rng() < 0.08;
       const y = Math.round(b.rng() * 9) / 9 * h * 0.9 + h * 0.05;
       const z = Math.round((b.rng() - 0.5) * 6) / 6 * d * 0.85;
-      const i = put(rx - Math.sign(rx) * (w / 2 + 0.006), ry + y, rz + z, hot ? C.iceHi : C.ice, hot ? 0.8 : 0.45, 0.014);
+      const i = put(rx - Math.sign(rx) * (w / 2 + 0.006), ry + y, rz + z, hot ? C.yellow : C.ice, hot ? 0.6 : 0.45, 0.014);
       b.twinkle(i, 1);
     }
 
@@ -127,24 +128,27 @@ export default {
       const y = layers[k % 3];
       const a = b.rng() * TAU;
       const r = 0.13 + b.gauss() * 0.006;
-      const i = put(r * Math.cos(a), y + 0.02 + b.gauss() * 0.006, r * Math.sin(a), C.iceHi, 0.6, 0.014);
+      const i = put(r * Math.cos(a), y + 0.02 + b.gauss() * 0.006, r * Math.sin(a), C.core, 0.6, 0.014);
       transform(M, 0, 1, 0, v);
       b.orbit(i, v[0], v[1], v[2], 0.6);
     }
 
-    // Queues: packets bunched in the aisle before each chokepoint, crawling forward.
+    // Queues: packets bunched in the aisle before each chokepoint, crawling forward and heating along
+    // the blackbody as they jam (ice at the back of the queue, then dull red → orange → white-hot).
     const queue = b.quota(0.08);
+    const heat = [0, 0, 0];
     for (let k = 0; k < queue; k++) {
       if (b.tick()) yield;
       const y = layers[k % 3] + 0.03;
       const side = b.rng() < 0.5 ? -1 : 1;
       const dist = 0.15 + Math.pow(b.rng(), 1.6) * 0.6;
       const near = 1 - dist / 0.75;
-      const i = put(b.gauss() * 0.035, y + Math.abs(b.gauss()) * 0.02, side * dist, mix(C.ice, C.iceHi, near * near), 0.16 + 0.36 * near, 0.013);
+      kelvin(1900 + 4700 * Math.pow(near, 1.4), 1, heat);
+      const i = put(b.gauss() * 0.035, y + Math.abs(b.gauss()) * 0.02, side * dist, mix(C.iceHi, heat, smoothstep(0.0, 0.3, near)), 0.16 + 0.36 * near * near, 0.013);
       flowL(i, 0, 0, -side * 0.07, 0.05 + 0.04 * b.rng());
     }
 
-    // Packets: running down the centre aisle and the cross-aisles toward the queue.
+    // Packets: ice-white, running down the centre aisle and the cross-aisles toward the queue.
     const packets = b.quota(0.1);
     for (let k = 0; k < packets; k++) {
       if (b.tick()) yield;
@@ -152,21 +156,21 @@ export default {
       const side = b.rng() < 0.5 ? -1 : 1;
       let i;
       if (b.rng() < 0.6) {
-        i = put(b.gauss() * 0.012, y, side * half, C.white, 0.26, 0.013);
+        i = put(b.gauss() * 0.012, y, side * half, C.iceHi, 0.24, 0.013);
         flowL(i, 0, 0, -side * (half - 0.72), 0.22 + 0.08 * b.rng());
       } else {
         const zr = (rackRows[Math.floor(b.rng() * 4)] + 0.275) * 1;
         const sx = b.rng() < 0.5 ? -1 : 1;
-        i = put(sx * half, y, zr, C.ice, 0.22, 0.012);
+        i = put(sx * half, y, zr, mix(C.ice, C.white, 0.35), 0.2, 0.012);
         flowL(i, -sx * half, 0, 0, 0.16 + 0.06 * b.rng());
       }
     }
 
-    // The shared column: data squeezing upward through the chokepoints.
+    // The shared column: data squeezing upward through the chokepoints, white-hot.
     const column = b.quota(0.05);
     for (let k = 0; k < column; k++) {
       if (b.tick()) yield;
-      const i = put(b.gauss() * 0.02, -0.95, b.gauss() * 0.02, mix(C.iceHi, C.white, b.rng() * 0.6), 0.26, 0.012);
+      const i = put(b.gauss() * 0.02, -0.95, b.gauss() * 0.02, mix(C.hot, C.white, b.rng() * 0.5), 0.26, 0.012);
       flowL(i, 0, 2.4, 0, 0.12 + 0.04 * b.rng());
     }
   },

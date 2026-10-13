@@ -1,11 +1,14 @@
-// Ch.5 star: a blue-white photosphere (white-hot granules, ice-cyan lanes, a limb that darkens to deep
-// blue) with animated granulation, a streamered corona billboard and a wide ice halo. The sphere writes depth (when fully present) so collectors
-// passing behind the star are hidden.
+// Ch.5 star: a sun-like photosphere (STAR_TEMP, 5000 K) coloured by the blackbody per fragment — hot granules
+// (rising, ~+250 K) and cooler intergranular lanes (~−330 K), boiling slowly; limb darkening in both
+// intensity (quadratic law) and colour (toward the limb we see higher, cooler layers: yellow-white at
+// the centre, orange toward the edge); a thin pink H-alpha chromosphere at the limb; a pearly corona
+// (scattered photospheric light) with streamers and a wide, faint halo. The sphere writes depth (when
+// fully present) so collectors passing behind the star are hidden.
 
 import * as THREE from 'three';
 import { C } from '../config.js';
+import { blackbodyGlsl, kelvin } from '../math.js';
 import { STAR_RADIUS } from '../formations/energy.js';
-import { keep } from '../formations/common.js';
 import { additive, billboard, createGlow } from './materials.js';
 
 const noise = /* glsl */ `
@@ -52,26 +55,31 @@ void main() {
 const sphereFragment = /* glsl */ `
 uniform float uTime;
 uniform float uOpacity;
-uniform vec3 uHot;
-uniform vec3 uMid;
-uniform vec3 uCool;
+uniform float uTemp;
+uniform float uGain;
+uniform vec3 uChromo;
 varying vec3 vObj;
 varying vec3 vN;
 varying vec3 vV;
 ${noise}
+${blackbodyGlsl()}
 void main() {
   float mu = clamp(dot(vN, vV), 0.0, 1.0);
-  // Granulation: bright cells with dark lanes, slowly boiling; large-scale supergranulation.
-  vec3 p = vObj * 9.0 + vec3(0.0, uTime * 0.035, 0.0);
-  float cells = fbm3(p + (vnoise(p * 0.7 + uTime * 0.02) * 0.9375) * 1.6);
-  float lanes = smoothstep(0.32, 0.62, cells);
-  float large = fbm2(vObj * 2.4 - uTime * 0.012);
-  float limb = 0.36 + 0.64 * pow(mu, 0.55);
-  vec3 col = mix(uCool, uMid, lanes);
-  col = mix(col, uHot, smoothstep(0.55, 0.85, cells + large * 0.25) * 0.75);
-  col *= limb * (0.85 + 0.3 * large);
-  // Thin bright rim (chromosphere) at the limb.
-  col += uCool * pow(1.0 - mu, 6.0) * 0.6;
+  // Granulation: hot rising cells, cooler sinking lanes, slowly boiling; large-scale supergranulation.
+  vec3 p = vObj * 17.0 + vec3(0.0, uTime * 0.05, 0.0);
+  float cells = fbm3(p + (vnoise(p * 0.7 + uTime * 0.03) * 0.9375) * 1.6);
+  float gran = smoothstep(0.3, 0.66, cells);
+  float large = fbm2(vObj * 3.1 - uTime * 0.012);
+  float hot = smoothstep(0.58, 0.85, cells + large * 0.2);
+  float T = uTemp + mix(-260.0, 40.0, gran) + 150.0 * hot + 60.0 * (large - 0.5);
+  // Limb: the intensity falls by the quadratic law, and the light comes from higher, cooler layers.
+  float m1 = 1.0 - mu;
+  float I = 1.0 - 0.47 * m1 - 0.23 * m1 * m1;
+  float Tlimb = T * mix(0.7, 1.0, pow(mu, 0.35));
+  float contrast = pow(T / uTemp, 4.0);
+  vec3 col = blackbody(Tlimb) * (I * contrast * uGain);
+  // The chromosphere: a thin H-alpha rim at the very limb.
+  col += uChromo * pow(m1, 7.0);
   gl_FragColor = vec4(col * uOpacity, 1.0);
 }
 `;
@@ -91,12 +99,19 @@ void main() {
   float streamers = fbm3(vec3(cos(a) * 2.6, sin(a) * 2.6, r * 0.6 - uTime * 0.05));
   streamers = 0.45 + 0.9 * pow(streamers, 1.6);
   float h = r - 1.0;
-  float corona = exp(-h * 3.4) * streamers + exp(-h * 16.0) * 0.8;
+  float corona = exp(-h * 3.4) * streamers + exp(-h * 16.0) * 0.3;
   float edge = 1.0 - smoothstep(uExtent * 0.7, uExtent, r);
   vec3 col = mix(uOuter, uInner, exp(-h * 2.4)) * corona * edge;
   gl_FragColor = vec4(col * uOpacity * 0.55, 1.0);
 }
 `;
+
+/**
+ * The photosphere's temperature: sun-like. 5800 K is the Sun's effective temperature, but rendered
+ * bright through the filmic shoulder it reads plain white; the yellow-white Sun of every photograph
+ * (seen through air, exposed to keep the disc) sits nearer 5000 K, which is what the eye reads as 'a sun'.
+ */
+const STAR_TEMP = 5000;
 
 const pingPong = (t, P) => {
   const m = t % (2 * P);
@@ -106,11 +121,14 @@ const pingPong = (t, P) => {
 export class StarAccent {
   constructor() {
     this.group = new THREE.Group();
-    // Blue-white: the granules stay just below white so the cells and their ice-cyan lanes read.
-    const hot = new THREE.Vector3(...C.iceHi).multiplyScalar(1.3);
-    const mid = new THREE.Vector3(...keep(C.white, C.ice, 0.55)).multiplyScalar(0.9);
-    const cool = new THREE.Vector3(...keep(C.ice, C.deep, 0.55)).multiplyScalar(0.55);
-    this.sphereUniforms = { uTime: { value: 0 }, uOpacity: { value: 0 }, uHot: { value: hot }, uMid: { value: mid }, uCool: { value: cool } };
+    // A sun-like photosphere: colour from the blackbody at each fragment's temperature.
+    this.sphereUniforms = {
+      uTime: { value: 0 },
+      uOpacity: { value: 0 },
+      uTemp: { value: STAR_TEMP },
+      uGain: { value: 0.95 },
+      uChromo: { value: new THREE.Vector3(...C.halpha).multiplyScalar(0.3) },
+    };
     this.sphere = new THREE.Mesh(
       new THREE.SphereGeometry(STAR_RADIUS, 96, 64),
       new THREE.ShaderMaterial({ name: 'Star', uniforms: this.sphereUniforms, vertexShader: sphereVertex, fragmentShader: sphereFragment, ...additive, depthWrite: true }),
@@ -122,13 +140,14 @@ export class StarAccent {
       uTime: { value: 0 },
       uOpacity: { value: 0 },
       uExtent: { value: extent },
-      uInner: { value: new THREE.Vector3(...keep(C.iceHi, C.ice, 0.3)).multiplyScalar(1.3) },
-      uOuter: { value: new THREE.Vector3(...keep(C.ice, C.deep, 0.5)).multiplyScalar(0.7) },
+      // The corona is photospheric light scattered by free electrons: pearly, barely warm.
+      uInner: { value: new THREE.Vector3(...kelvin(STAR_TEMP, 0.7)).multiplyScalar(0.75) },
+      uOuter: { value: new THREE.Vector3(...kelvin(STAR_TEMP, 0.5)).multiplyScalar(0.3) },
     };
     this.corona = new THREE.Mesh(billboard.quad, new THREE.ShaderMaterial({ name: 'Corona', uniforms: this.coronaUniforms, vertexShader: billboard.vertex, fragmentShader: coronaFragment, ...additive }));
     this.corona.frustumCulled = false;
     this.corona.renderOrder = 6;
-    this.halo = createGlow({ core: [0, 0, 0], halo: C.ice, scale: STAR_RADIUS * 5.5, intensity: 0.16 });
+    this.halo = createGlow({ core: [0, 0, 0], halo: kelvin(STAR_TEMP, 0.8), scale: STAR_RADIUS * 5.5, intensity: 0.05 });
     this.group.add(this.sphere, this.corona, this.halo);
   }
 

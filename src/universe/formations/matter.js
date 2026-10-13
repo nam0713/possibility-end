@@ -1,7 +1,9 @@
-// Ch.4 물질 MATTER — a crystal assembling itself from a white-hot seed: a cubic lattice grown as an
+// Ch.4 물질 MATTER — an ice crystal assembling itself from a small warm seed: a cubic lattice grown as an
 // octahedral core with six dendrite arms and fishbone side branches. Each lattice site is an
 // atom (a bright point in a faint shell). Loose matter around it falls onto the growth front.
-// The lattice reveals outward from the seed as you read — structure and program merge.
+// The lattice reveals outward from the seed as you read — structure and program merge. Colour runs
+// with growth: the old, dense core deep blue, the grown lattice ice, the newest atoms at the tips white;
+// only the seed at the heart emits (a white-hot nucleus in a 4800 K glow).
 
 import { C, HEX } from '../config.js';
 import { eulerMatrix } from '../math.js';
@@ -54,7 +56,7 @@ export default {
   radius: 2.45,
   center: [0, 0, 0],
   view: { yaw: 0.0, pitch: 0.28 },
-  tint: HEX.ice,
+  tint: HEX.deep,
   morph: 'chapter',
   // Reveal outward from the seed as you read. The chapter cover (reading 0) already shows a
   // substantial crystal, about three quarters grown; the last stretch grows with the text.
@@ -71,14 +73,16 @@ export default {
       sitePosition(s, p);
       const d = Math.hypot(s[0], s[1], s[2]) / maxD;
       const ev = Math.min(0.97, 0.04 + d * 0.92);
-      // The seed's neighbourhood is white-hot; the grown lattice cools to ice (luminance, not hue).
-      const col = keep(C.iceHi, keep(C.white, C.ice, 0.55), Math.min(1, d * 2.4));
+      // Deep-blue core → ice lattice → white tips (the growth front), the tips a little brighter.
+      const col = d < 0.45 ? keep(C.deep, C.ice, Math.pow(d / 0.45, 1.5)) : keep(C.ice, C.white, Math.pow((d - 0.45) / 0.55, 1.3));
+      // The dense core stays deep (its atoms overlap: a little dimmer, so it does not bloom white).
+      const tip = (1 + 0.5 * Math.max(0, (d - 0.6) / 0.4)) * (0.75 + 0.25 * Math.min(1, d / 0.3));
       // Nucleus.
       for (let k = 0; k < perAtom; k++) {
         if (b.tick()) yield;
         const nucleus = k < perAtom * 0.4;
         const sig = nucleus ? 0.008 : 0.026;
-        const i = b.point(p[0] + b.gauss() * sig, p[1] + b.gauss() * sig, p[2] + b.gauss() * sig, col, nucleus ? 0.42 : 0.035, nucleus ? 0.012 : 0.01);
+        const i = b.point(p[0] + b.gauss() * sig, p[1] + b.gauss() * sig, p[2] + b.gauss() * sig, col, (nucleus ? 0.42 : 0.035) * tip, nucleus ? 0.012 : 0.01);
         b.orbit(i, ax[0], ax[1], ax[2], CRYSTAL.spin);
         b.evolve(i, ev);
       }
@@ -98,8 +102,8 @@ export default {
       b.orbit(i, ax[0], ax[1], ax[2], CRYSTAL.spin);
     }
 
-    // Seed: a white-hot heart.
-    cluster(b, b.quota(0.012), 0, 0, 0, 0.04, C.iceHi, 0.7, 0.02, { falloff: 1.2 });
+    // Seed: a small warm heart, the one thing here that emits.
+    cluster(b, b.quota(0.012), 0, 0, 0, 0.04, C.sun, 0.4, 0.02, { falloff: 1.2 });
 
     // Disordered gas: the raw matter still waiting to be organised.
     const gas = b.quota(0.18);
@@ -107,7 +111,7 @@ export default {
       if (b.tick()) yield;
       unitVector(b, dir);
       const r = 1.0 + Math.pow(b.rng(), 0.7) * 2.6;
-      const i = b.point(dir[0] * r, dir[1] * r * 0.85, dir[2] * r, mix(C.steel, C.deep, b.rng()), 0.012 + 0.018 * b.rng(), 0.011 + 0.006 * b.rng());
+      const i = b.point(dir[0] * r, dir[1] * r * 0.85, dir[2] * r, mix(C.mist, C.web, b.rng()), 0.014 + 0.02 * b.rng(), 0.011 + 0.006 * b.rng());
       b.orbit(i, b.rng() - 0.5, 1, b.rng() - 0.5, 0.05 + 0.08 * b.rng());
       b.twinkle(i, 0.5);
     }

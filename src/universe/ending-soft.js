@@ -1,14 +1,16 @@
 // The film's volumetric light, in two passes:
 //
 //  · the soft pass (low resolution, blurred): the newborn plasma seen from outside as an
-//    incandescent fireball (ray-marched) — white-hot at its heart, ice cyan, a deep-blue limb —
+//    incandescent fireball (ray-marched; blackbody) — white-hot at its heart, yellow, orange, a
+//    dull red limb —
 //    the vacuum choosing its state as a few nucleating bubbles; later the dark ages' gas
 //    condensing into the first density knots (analytic line integrals of one Gaussian cloud per
 //    web node);
 //  · the thread pass (near full resolution, no blur): inside the plasma. Inflation drags the
-//    eye through a web of incandescent threads — white-hot cores burning out through ice cyan
-//    into deep-blue skirts — that thin, split into deep-blue and pale ice strands, break into
-//    beads and dissolve. One hue family throughout (ending-glsl.js PALETTE).
+//    eye through a web of incandescent threads — white cores burning out through yellow-orange
+//    bodies (a third of the bundles hotter: blue-white cores) into red skirts — that thin and cool,
+//    split into dull red strands and the hottest blue-white ones, break into beads and dissolve
+//    (ending-glsl.js blackbody, burn / burnHot).
 //    The threads are anti-aliased iso-lines of a 3D field cut by a few spherical shells around
 //    the camera: crisp at any resolution, no ray-march noise, honest parallax.
 // Both are added into the HDR scene before the particles.
@@ -114,7 +116,7 @@ vec3 plasma(vec3 ro, vec3 rd) {
   vec3 acc = vec3(0.0);
   float trans = 1.0;
   // Sight lines through the middle reach the hot core; toward the limb they only graze the
-  // cooler outer layers: a white-hot core burning out through ice cyan into deep blue.
+  // cooler outer layers: a white-hot core burning out through yellow and orange into a red limb.
   float mu = 1.0;
   if (outside) {
     float miss = sqrt(max(dot(ro, ro) - b * b, 0.0)) / max(rho, 1e-5);
@@ -144,15 +146,18 @@ vec3 plasma(vec3 ro, vec3 rd) {
     float glow = 0.3 + 0.7 * smoothstep(-0.55, 0.6, n);
     float threads = fil * 4.0 + smoothstep(0.3, 0.9, n) * 0.1;
     float dens = mix(glow, mix(threads, glow, uFill), phase) * edge;
-    // The supercooled false vacuum sinks to a dimmer, deeper blue; the reheated true vacuum inside
+    // The supercooled false vacuum sinks to a dimmer, redder glow; the reheated true vacuum inside
     // the bubbles burns hotter (paler, brighter).
     float k = uTemp + 0.24 * n - coreHeat - 0.22 * smoothstep(0.8, 1.08, rn) - uSupercool * (1.0 - phase) + 0.14 * min(fil * 3.0, 1.0);
+    // As the fireball hands over to the threads it fades by cooling (orange, red) as it dims.
+    k -= 0.4 * (1.0 - uPlasma);
     float fresh = bw.x * (1.0 - uBubbleDone);
     vec3 src = burn(k) * (1.0 + 0.9 * fresh);
     float kap = uKappa * mix(1.0, 0.3, fresh);
     float front = exp(-fi * 1.2);
-    // The bubble walls: a thin, bright, ice-white front where the latent heat is released.
-    vec3 wall = P_HI * bw.y * uWall * edge;
+    // The bubble walls: a thin front where the latent heat is released — hotter than anything
+    // around it, white (~8 000 K; a bluer front over the orange would read violet).
+    vec3 wall = mix(blackbody(8000.0), vec3(1.0), 0.4) * 0.8 * bw.y * uWall * edge;
     acc += trans * (src * dens + wall) * dt * front;
     trans *= exp(-kap * dens * dt);
     if (trans < 0.02) break;
@@ -183,10 +188,12 @@ vec3 gas(vec3 ro, vec3 rd) {
     float col = (exp(-b2 / s2) * 0.62 + exp(-b2 / (s2 * 6.0)) * 0.38 / 6.0) * (0.5 + 0.5 * tanh(1.15 * tc / sig)) * sqrt(sig) * 2.5 / s2;
     // Not over the lens: a cloud the camera is inside only lifts the haze.
     col *= smoothstep(sig * 0.6, sig * 2.2, length(v));
-    // Cold gas: deep blue in the small knots, paler ice in the massive ones.
-    vec3 tint = mix(P_DEEP, vec3(0.5, 0.82, 1.0), kb.z);
-    // The first stars light the densest knots once they ignite: their gas brightens toward ice-white.
-    tint = mix(tint, P_HI * 1.15, uGasLit * x * kb.z);
+    // Cold neutral gas: barely there, a dim neutral blue-grey (it only scatters faint light).
+    vec3 tint = mix(vec3(0.3, 0.32, 0.42), WEB * 0.9, kb.z);
+    // The first stars ionise the densest knots once they ignite: HII regions glow H-alpha pink-red,
+    // with a teal O-III core where the gas is hottest (the massive knots).
+    vec3 hii = mix(H_ALPHA, mix(H_ALPHA, O_III, 0.55), smoothstep(0.55, 1.0, kb.z) * x) * 1.1;
+    tint = mix(tint, hii, uGasLit * x * kb.z);
     acc += tint * col * kb.x * (0.35 + 0.65 * x);
   }
   return acc;
@@ -213,8 +220,8 @@ ${SIMPLEX}
 ${PALETTE}
 ${BURN}
 
-// The second family of strands (differentiation): pale ice, white at the core.
-const vec3 ICE = vec3(0.36, 0.82, 1.0);
+// The second family of strands (differentiation): the hottest, blue-white (~20 000 K).
+const vec3 ICE = vec3(0.41, 0.54, 1.0);
 
 // A strand's cross-section: a thin core and a short skirt (fainter, so it burns a deeper blue).
 float strand(float x, float wc, float hw) {
@@ -226,12 +233,13 @@ void main() {
   vec3 rd = normalize(uCamFwd + ndc.x * uTan.x * uCamRight + ndc.y * uTan.y * uCamUp);
   vec3 col = vec3(0.0);
   float d = uNear;
-  // Incandescence: a strand's temperature follows its brightness — white-hot where it blazes,
-  // ice cyan, then deep blue toward its faint parts and edges. The whole web cools with time.
+  // Incandescence (blackbody): a strand's temperature follows its brightness — white where it
+  // blazes, yellow and orange, then a dull red toward its faint parts and edges. The whole web
+  // cools with time.
   float kBase = mix(0.24, 0.04, uCool);
   float kSpan = mix(0.98, 0.7, uCool);
   // Strands run in braided bundles (iso-lines of one field at a few levels); as the plasma thins
-  // the outer strands fade, and pale ice strands appear between the cooling deep-blue ones
+  // the outer strands fade, and blue-white strands (the hottest) appear between the cooling red ones
   // (differentiation).
   const float LEVEL = 0.1;
   for (int k = 0; k < SHELLS; k++) {
@@ -267,7 +275,12 @@ void main() {
     float att = gate * edge * crowd * bead * focus * (1.0 - 0.08 * fk);
     float lum = min(hotV, 1.6) * along;
     // Farther strands are a little cooler (the eye reads them as deeper).
-    vec3 hot = burn(kBase + kSpan * min(lum, 1.15) - 0.03 * fk) * lum;
+    // Two populations burn side by side, region by region (the warp field, free here): most bundles
+    // at one temperature scale (white cores, yellow-orange bodies, red skirts), about a third
+    // hotter (blue-white cores, yellow-white bodies, orange skirts).
+    float kk = kBase + kSpan * pow(min(lum, 1.15), 1.6) - 0.03 * fk;
+    float fam = smoothstep(0.08, 0.34, w1);
+    vec3 hot = mix(burn(kk), burnHot(kk), fam) * lum;
     float li = iceV * along;
     vec3 ice = (ICE + vec3(0.6) * li * li) * li * 1.25;
     col += (hot * (1.0 - 0.35 * uDiff) + ice * uDiff * smoothstep(-0.4, 0.4, 0.15 - n)) * att;

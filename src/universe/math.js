@@ -125,3 +125,90 @@ export function applyMatrix(out, m, x, y, z) {
   out[2] = m[6] * x + m[7] * y + m[8] * z;
   return out;
 }
+
+// ---- Blackbody (Planck) colour ------------------------------------------------------------------
+//
+// Thermal light in the universe follows a blackbody by temperature (design/V9.1-FEEDBACK.md,
+// amendment 2): Planck's law integrated against the CIE 1931 2° colour-matching functions (the
+// Wyman–Sloan–Shirley multi-lobe fit), XYZ → linear sRGB (D65). ~6500 K is white; cooler is dull red →
+// orange → yellow, hotter turns faintly blue-white. Out-of-gamut negatives (the reddest embers) clip
+// to 0. Results are cached per whole kelvin.
+
+const lobe = (x, mu, s1, s2) => {
+  const t = (x - mu) / (x < mu ? s1 : s2);
+  return Math.exp(-0.5 * t * t);
+};
+const bbCache = new Map();
+
+/** Unnormalised linear sRGB of a blackbody at T kelvin, plus its luminance Y: [r, g, b, Y]. */
+function planckRgb(T) {
+  const key = Math.round(T);
+  let v = bbCache.get(key);
+  if (v) return v;
+  let X = 0, Y = 0, Z = 0;
+  for (let l = 380; l <= 780; l += 5) {
+    const m = l * 1e-9;
+    const B = 1 / (m * m * m * m * m * (Math.exp(1.4387769e-2 / (m * key)) - 1));
+    X += B * (1.056 * lobe(l, 599.8, 37.9, 31.0) + 0.362 * lobe(l, 442.0, 16.0, 26.7) - 0.065 * lobe(l, 501.1, 20.4, 26.2));
+    Y += B * (0.821 * lobe(l, 568.8, 46.9, 40.5) + 0.286 * lobe(l, 530.9, 16.3, 31.1));
+    Z += B * (1.217 * lobe(l, 437.0, 11.8, 36.0) + 0.681 * lobe(l, 459.0, 26.0, 13.8));
+  }
+  const r = Math.max(0, 3.2406 * X - 1.5372 * Y - 0.4986 * Z);
+  const g = Math.max(0, -0.9689 * X + 1.8758 * Y + 0.0415 * Z);
+  const b = Math.max(0, 0.0557 * X - 0.204 * Y + 1.057 * Z);
+  v = [r / Y, g / Y, b / Y, 1];
+  bbCache.set(key, v);
+  return v;
+}
+
+/**
+ * Kelvin → linear sRGB chromaticity, brightest channel = 1 (multiply by a brightness).
+ * `sat` < 1 desaturates toward the equal-luminance grey (restraint for small, dim stars).
+ */
+export function kelvin(T, sat = 1, out = [0, 0, 0]) {
+  const v = planckRgb(clamp(T, 800, 60000));
+  let r = v[0], g = v[1], b = v[2];
+  if (sat !== 1) {
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = y + (r - y) * sat; g = y + (g - y) * sat; b = y + (b - y) * sat;
+  }
+  const m = Math.max(r, g, b) || 1;
+  out[0] = r / m; out[1] = g / m; out[2] = b / m;
+  return out;
+}
+
+/** Kelvin → linear sRGB with luminance (Rec. 709 Y) = 1: equal perceived brightness at any temperature. */
+export function kelvinY(T, sat = 1, out = [0, 0, 0]) {
+  kelvin(T, sat, out);
+  const y = 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2] || 1;
+  out[0] /= y; out[1] /= y; out[2] /= y;
+  return out;
+}
+
+/** Linear rgb → '#rrggbb' (display), clamped. */
+export function linearToHex(c) {
+  const h = (x) => Math.round(clamp(linearToSrgb(clamp(x, 0, 1)), 0, 1) * 255).toString(16).padStart(2, '0');
+  return `#${h(c[0])}${h(c[1])}${h(c[2])}`;
+}
+
+/**
+ * GLSL `vec3 blackbody(float kelvin)`: linear sRGB, brightest channel = 1, tabulated from kelvin()
+ * on a log-temperature grid (1000–40000 K, 32 entries, linear interpolation) — the same curve as the
+ * JS helper, for shaders whose temperature varies per fragment (granulation, Doppler shift).
+ */
+export function blackbodyGlsl() {
+  const N = 32, lo = Math.log(1000), hi = Math.log(40000);
+  const rows = [];
+  for (let k = 0; k < N; k++) {
+    const c = kelvin(Math.exp(lo + ((hi - lo) * k) / (N - 1)));
+    rows.push(`vec3(${c.map((x) => x.toFixed(4)).join(', ')})`);
+  }
+  return /* glsl */ `
+const vec3 BB_TABLE[${N}] = vec3[${N}](${rows.join(', ')});
+vec3 blackbody(float kelvin) {
+  float x = clamp((log(max(kelvin, 1.0)) - ${lo.toFixed(6)}) / ${(hi - lo).toFixed(6)}, 0.0, 1.0) * ${(N - 1).toFixed(1)};
+  int i = int(min(floor(x), ${(N - 2).toFixed(1)}));
+  return mix(BB_TABLE[i], BB_TABLE[i + 1], x - float(i));
+}
+`;
+}

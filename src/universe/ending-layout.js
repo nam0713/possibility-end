@@ -5,7 +5,7 @@
 // +Y is up, and one unit = the engine camera distance. The film camera therefore
 // starts at (0, 0, 1) looking at the origin — the exact view the reader saw.
 //
-// After the impact, the web, the hero galaxy, its blue-white star and the small blue
+// After the impact, the web, the hero galaxy, its sun-like star and the small blue
 // planet all live in F. Scales are cinematic, not astronomical: the zoom from the
 // web to the planet spans ~4 decades and stays well inside float32 precision.
 
@@ -50,7 +50,7 @@ export function galaxyDir(azimuth, elevation) {
   return norm(add(add(scale(GAL_E1, Math.cos(azimuth) * c), scale(GAL_E2, Math.sin(azimuth) * c)), scale(n, Math.sin(elevation))));
 }
 
-// The blue-white star sits in the outskirts (0.72 R) on the side the camera comes from.
+// The star sits in the outskirts (0.72 R) on the side the camera comes from.
 export const SUN_AZIMUTH = 0.62;
 export const SUN = add(HERO, scale(galaxyDir(SUN_AZIMUTH, 0), GALAXY_RADIUS * 0.72));
 

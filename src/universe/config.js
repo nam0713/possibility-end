@@ -1,30 +1,63 @@
 // Shared constants: palette, quality tiers, compositions, morph timing and the reading starfield.
 // Everything an art director would want to tune lives here.
 
-import { hexToLinear } from './math.js';
+import { hexToLinear, kelvin, linearToHex } from './math.js';
 
 /**
- * Display-space palette (sRGB hex): ONE cold hue family, ~190–210° (design/V9.1-FEEDBACK.md). Every
- * colour in the universe is one of these or a mix of them (computed in linear light, so mixes stay
- * inside the family): formations vary luminance and saturation, never hue. No warm colour exists.
+ * Colour (design/V9.1-FEEDBACK.md, amendment 2: "make it physically right"). The UI keeps its single
+ * ice accent; the universe's colour is physically motivated:
+ *   structure  ice / white / deep blue — the abstract formations (cover ring, ch.1–4), the signals, the
+ *              last threads. It ties the universe to the UI.
+ *   heat       a blackbody (Planck) ramp by temperature — `kelvin(T)` in math.js, never hand-picked:
+ *              everything that emits (cores, nodes, pulses, factories, chokepoints, stars, the accretion
+ *              disc, the seed) takes the colour of its temperature (`K` below).
+ *   gas, dust  astrophotography colours: H-alpha pink (HII knots), blue reflection / young arms,
+ *              brown-grey dust lanes, a neutral-blue cosmic web.
+ * White and the near-black background are luminance. Mixes are computed in linear light.
  */
 export const HEX = {
   space: '#04070b', // background
   white: '#eaf2f8', // fg: cold white (low saturation)
   ink: '#dde6ed', // ink
-  ice: '#a9e7f2', // accent — the theme colour: ice cyan (the most saturated light tone)
-  iceHi: '#e6fbff', // accent-hi: brightest cores and glows (seed, singularity, star cores)
-  deep: '#4f8fb0', // accent-deep: low-emphasis lines and fills, deep glows
-  deepest: '#1b3a52', // deepest: dust, far haze
+  ice: '#a9e7f2', // ice cyan: the structure hue (the UI's theme colour)
+  iceHi: '#e6fbff', // ice highlights
+  deep: '#4f8fb0', // ice depths: low-emphasis lines and fills
+  deepest: '#1b3a52', // ice depths: dust, far haze
+  halpha: '#ec7f9c', // HII regions as photographed: H-alpha red blended with H-beta → pink
+  reflection: '#86a9de', // blue reflection nebulosity, scattered starlight
+  dust: '#5e5047', // brown-grey dust lanes
+  web: '#7d8fb4', // the cosmic web's neutral blue haze
 };
+
+/**
+ * Temperatures (kelvin) of everything that emits. Thermal colours are `kelvin(T)` (brightest channel 1):
+ *   ember 1800  dull red: the dimmest embers, a radiator's waste heat, the disc's outer edge
+ *   cinder 2700 the late universe's last red dwarfs, sparks cooling
+ *   orange 3900 K-type stars, factory furnaces, old bulges
+ *   yellow 4800 the warm side of white: old stellar populations, products fresh off the line
+ *   sun 5800    a sun-like photosphere (yellow-white)
+ *   hot 5900    white-hot, slightly warm: the seed, singularities, cores (the light of the ending)
+ *   whiteStar 7200  white stars (A/F)
+ *   blueStar 12000  blue-white: hot young stars (B)
+ */
+export const K = { ember: 1800, cinder: 2700, orange: 3900, yellow: 4800, sun: 5800, hot: 5900, whiteStar: 7200, blueStar: 12000 };
 
 /** Linear-light palette for particle colours and shader uniforms. */
 export const C = Object.fromEntries(Object.entries(HEX).map(([k, v]) => [k, hexToLinear(v)]));
 const mixLinear = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-/** Derived mid-tones (linear mixes of the palette, same hue family). steel: a muted blue-grey. */
+/** Derived mid-tones (linear mixes). steel: a muted blue-grey. */
 C.steel = mixLinear(C.deep, C.white, 0.15);
 /** mist: deep, desaturated haze between deep and deepest. */
 C.mist = mixLinear(C.deepest, C.deep, 0.5);
+/** Blackbody colours at the temperatures above (linear, brightest channel 1): C.ember … C.blueStar. */
+for (const [name, T] of Object.entries(K)) C[name] = kelvin(T);
+/**
+ * White-hot heart of the seed, the singularities and the cores: the `hot` blackbody bleached toward
+ * white, as a light far brighter than its surroundings saturates on film (and in the eye).
+ */
+C.core = mixLinear(C.hot, [1, 1, 1], 0.45);
+/** Display hex of a temperature (formation tints, docs). */
+export const kelvinHex = (T) => linearToHex(kelvin(T));
 
 /**
  * Quality tiers. `particles` is fixed per tier (the shared morphing system);
@@ -132,6 +165,11 @@ export const POST = {
  *   parallax  pointer parallax / ambient sway kept at full scatter (calm behind text)
  *   bloom     bloom strength kept at full scatter (low bloom: crisp points)
  *   calm      star light kept in the text column (|x| < `column` of the half-width; wide screens)
+ *   temps     the four blackbody tones (K) the star colours run between: orange, yellow-white, white,
+ *             blue-white (equal luminance: brightness is the magnitude's job)
+ *   tones     breakpoints of the per-star tone along those four: [0, tones[0]) orange → yellow-white,
+ *             [tones[0], tones[1]) yellow-white → white, [tones[1], 1) white → blue-white
+ *   saturation  desaturation of the tones toward grey (1 = the pure blackbody): calm behind text
  */
 export const SCATTER = {
   stagger: 0.56,
@@ -154,4 +192,7 @@ export const SCATTER = {
   bloom: 0.45,
   calm: 0.62,
   column: 0.42,
+  temps: [3400, 5400, 7400, 15000],
+  tones: [0.12, 0.66],
+  saturation: 0.8,
 };

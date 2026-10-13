@@ -8311,7 +8311,7 @@
      * @param {Vector3} target - The target vector that is used to store the method's result.
      * @return {?Vector3} The interpolated value.
      */
-    static getInterpolation(point, p1, p2, p3, v1, v2, v3, target) {
+    static getInterpolation(point, p1, p2, p3, v1, v2, v32, target) {
       if (this.getBarycoord(point, p1, p2, p3, _v3$2) === null) {
         target.x = 0;
         target.y = 0;
@@ -8322,7 +8322,7 @@
       target.setScalar(0);
       target.addScaledVector(v1, _v3$2.x);
       target.addScaledVector(v2, _v3$2.y);
-      target.addScaledVector(v3, _v3$2.z);
+      target.addScaledVector(v32, _v3$2.z);
       return target;
     }
     /**
@@ -8486,8 +8486,8 @@
      * @param {Vector3} target - The target vector that is used to store the method's result.
      * @return {?Vector3} The interpolated value.
      */
-    getInterpolation(point, v1, v2, v3, target) {
-      return _Triangle.getInterpolation(point, this.a, this.b, this.c, v1, v2, v3, target);
+    getInterpolation(point, v1, v2, v32, target) {
+      return _Triangle.getInterpolation(point, this.a, this.b, this.c, v1, v2, v32, target);
     }
     /**
      * Returns `true` if the given point, when projected onto the plane of the
@@ -9124,6 +9124,118 @@
     }
     return true;
   }
+  var _tables = /* @__PURE__ */ _generateTables();
+  function _generateTables() {
+    const buffer = new ArrayBuffer(4);
+    const floatView = new Float32Array(buffer);
+    const uint32View = new Uint32Array(buffer);
+    const baseTable = new Uint32Array(512);
+    const shiftTable = new Uint32Array(512);
+    for (let i = 0; i < 256; ++i) {
+      const e = i - 127;
+      if (e < -27) {
+        baseTable[i] = 0;
+        baseTable[i | 256] = 32768;
+        shiftTable[i] = 24;
+        shiftTable[i | 256] = 24;
+      } else if (e < -14) {
+        baseTable[i] = 1024 >> -e - 14;
+        baseTable[i | 256] = 1024 >> -e - 14 | 32768;
+        shiftTable[i] = -e - 1;
+        shiftTable[i | 256] = -e - 1;
+      } else if (e <= 15) {
+        baseTable[i] = e + 15 << 10;
+        baseTable[i | 256] = e + 15 << 10 | 32768;
+        shiftTable[i] = 13;
+        shiftTable[i | 256] = 13;
+      } else if (e < 128) {
+        baseTable[i] = 31744;
+        baseTable[i | 256] = 64512;
+        shiftTable[i] = 24;
+        shiftTable[i | 256] = 24;
+      } else {
+        baseTable[i] = 31744;
+        baseTable[i | 256] = 64512;
+        shiftTable[i] = 13;
+        shiftTable[i | 256] = 13;
+      }
+    }
+    const mantissaTable = new Uint32Array(2048);
+    const exponentTable = new Uint32Array(64);
+    const offsetTable = new Uint32Array(64);
+    for (let i = 1; i < 1024; ++i) {
+      let m = i << 13;
+      let e = 0;
+      while ((m & 8388608) === 0) {
+        m <<= 1;
+        e -= 8388608;
+      }
+      m &= -8388609;
+      e += 947912704;
+      mantissaTable[i] = m | e;
+    }
+    for (let i = 1024; i < 2048; ++i) {
+      mantissaTable[i] = 939524096 + (i - 1024 << 13);
+    }
+    for (let i = 1; i < 31; ++i) {
+      exponentTable[i] = i << 23;
+    }
+    exponentTable[31] = 1199570944;
+    exponentTable[32] = 2147483648;
+    for (let i = 33; i < 63; ++i) {
+      exponentTable[i] = 2147483648 + (i - 32 << 23);
+    }
+    exponentTable[63] = 3347054592;
+    for (let i = 1; i < 64; ++i) {
+      if (i !== 32) {
+        offsetTable[i] = 1024;
+      }
+    }
+    return {
+      floatView,
+      uint32View,
+      baseTable,
+      shiftTable,
+      mantissaTable,
+      exponentTable,
+      offsetTable
+    };
+  }
+  function toHalfFloat(val) {
+    if (Math.abs(val) > 65504) warn("DataUtils.toHalfFloat(): Value out of range.");
+    val = clamp(val, -65504, 65504);
+    _tables.floatView[0] = val;
+    const f = _tables.uint32View[0];
+    const e = f >> 23 & 511;
+    return _tables.baseTable[e] + ((f & 8388607) >> _tables.shiftTable[e]);
+  }
+  function fromHalfFloat(val) {
+    const m = val >> 10;
+    _tables.uint32View[0] = _tables.mantissaTable[_tables.offsetTable[m] + (val & 1023)] + _tables.exponentTable[m];
+    return _tables.floatView[0];
+  }
+  var DataUtils = class {
+    /**
+     * Returns a half precision floating point value (FP16) from the given single
+     * precision floating point value (FP32).
+     *
+     * @param {number} val - A single precision floating point value.
+     * @return {number} The FP16 value.
+     */
+    static toHalfFloat(val) {
+      return toHalfFloat(val);
+    }
+    /**
+     * Returns a single precision floating point value (FP32) from the given half
+     * precision floating point value (FP16).
+     *
+     * @param {number} val - A half precision floating point value.
+     * @return {number} The FP32 value.
+     */
+    static fromHalfFloat(val) {
+      return fromHalfFloat(val);
+    }
+  };
   var _vector$a = /* @__PURE__ */ new Vector3();
   var _vector2$1 = /* @__PURE__ */ new Vector2();
   var _id$2 = 0;
@@ -28174,6 +28286,140 @@ void main() {
     const s3 = s2 * s;
     return (2 * s3 - 3 * s2 + 1) * vs[i] + (s3 - 2 * s2 + s) * h * ms[i] + (-2 * s3 + 3 * s2) * vs[i + 1] + (s3 - s2) * h * ms[i + 1];
   }
+  var cmfLobe = (x, m, s1, s2) => {
+    const t = (x - m) * (x < m ? s1 : s2);
+    return Math.exp(-0.5 * t * t);
+  };
+  function blackbodyExact(T) {
+    let X = 0, Y = 0, Z = 0;
+    for (let l = 380; l <= 780; l += 2) {
+      const m2 = l * 1e-9;
+      const B = 1 / (m2 ** 5 * (Math.exp(0.014388 / (m2 * T)) - 1));
+      X += B * (1.056 * cmfLobe(l, 599.8, 0.0264, 0.0323) + 0.362 * cmfLobe(l, 442, 0.0624, 0.0374) - 0.065 * cmfLobe(l, 501.1, 0.049, 0.0382));
+      Y += B * (0.821 * cmfLobe(l, 568.8, 0.0213, 0.0247) + 0.286 * cmfLobe(l, 530.9, 0.0613, 0.0322));
+      Z += B * (1.217 * cmfLobe(l, 437, 0.0845, 0.0278) + 0.681 * cmfLobe(l, 459, 0.0385, 0.0725));
+    }
+    const r = Math.max(0, 3.2406 * X - 1.5372 * Y - 0.4986 * Z);
+    const g = Math.max(0, -0.9689 * X + 1.8758 * Y + 0.0415 * Z);
+    const b = Math.max(0, 0.0557 * X - 0.204 * Y + 1.057 * Z);
+    const m = Math.max(r, g, b) || 1;
+    return [r / m, g / m, b / m];
+  }
+  var BB_MIN_K = 800;
+  var BB_MAX_K = 4e4;
+  var BB_STEPS = 32;
+  var BB_TABLE = Object.freeze(Array.from({ length: BB_STEPS }, (_, i) => Object.freeze(blackbodyExact(BB_MIN_K * Math.pow(BB_MAX_K / BB_MIN_K, i / (BB_STEPS - 1))))));
+  function blackbody(T, out = [0, 0, 0]) {
+    const x = clamp2(Math.log(Math.max(T, 1) / BB_MIN_K) / Math.log(BB_MAX_K / BB_MIN_K) * (BB_STEPS - 1), 0, BB_STEPS - 1);
+    const i = Math.min(BB_STEPS - 2, Math.floor(x));
+    const f = x - i;
+    const a = BB_TABLE[i], b = BB_TABLE[i + 1];
+    out[0] = a[0] + (b[0] - a[0]) * f;
+    out[1] = a[1] + (b[1] - a[1]) * f;
+    out[2] = a[2] + (b[2] - a[2]) * f;
+    return out;
+  }
+  var GRAD3 = new Int8Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1]);
+  function createSimplex3(seed2) {
+    const rand2 = rng(seed2);
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(rand2() * (i + 1));
+      const t = p[i];
+      p[i] = p[j];
+      p[j] = t;
+    }
+    const perm = new Uint8Array(512);
+    const g12 = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) {
+      perm[i] = p[i & 255];
+      g12[i] = perm[i] % 12 * 3;
+    }
+    const F3 = 1 / 3, G3 = 1 / 6;
+    return function noise(x, y, z) {
+      const s = (x + y + z) * F3;
+      const i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+      const t = (i + j + k) * G3;
+      const x0 = x - (i - t), y0 = y - (j - t), z0 = z - (k - t);
+      let i1, j1, k1, i2, j2, k2;
+      if (x0 >= y0) {
+        if (y0 >= z0) {
+          i1 = 1;
+          j1 = 0;
+          k1 = 0;
+          i2 = 1;
+          j2 = 1;
+          k2 = 0;
+        } else if (x0 >= z0) {
+          i1 = 1;
+          j1 = 0;
+          k1 = 0;
+          i2 = 1;
+          j2 = 0;
+          k2 = 1;
+        } else {
+          i1 = 0;
+          j1 = 0;
+          k1 = 1;
+          i2 = 1;
+          j2 = 0;
+          k2 = 1;
+        }
+      } else if (y0 < z0) {
+        i1 = 0;
+        j1 = 0;
+        k1 = 1;
+        i2 = 0;
+        j2 = 1;
+        k2 = 1;
+      } else if (x0 < z0) {
+        i1 = 0;
+        j1 = 1;
+        k1 = 0;
+        i2 = 0;
+        j2 = 1;
+        k2 = 1;
+      } else {
+        i1 = 0;
+        j1 = 1;
+        k1 = 0;
+        i2 = 1;
+        j2 = 1;
+        k2 = 0;
+      }
+      const x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+      const x2 = x0 - i2 + 2 * G3, y2 = y0 - j2 + 2 * G3, z2 = z0 - k2 + 2 * G3;
+      const x3 = x0 - 1 + 0.5, y3 = y0 - 1 + 0.5, z3 = z0 - 1 + 0.5;
+      const ii = i & 255, jj = j & 255, kk = k & 255;
+      let n2 = 0, tt, g;
+      tt = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
+      if (tt > 0) {
+        g = g12[ii + perm[jj + perm[kk]]];
+        tt *= tt;
+        n2 += tt * tt * (GRAD3[g] * x0 + GRAD3[g + 1] * y0 + GRAD3[g + 2] * z0);
+      }
+      tt = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
+      if (tt > 0) {
+        g = g12[ii + i1 + perm[jj + j1 + perm[kk + k1]]];
+        tt *= tt;
+        n2 += tt * tt * (GRAD3[g] * x1 + GRAD3[g + 1] * y1 + GRAD3[g + 2] * z1);
+      }
+      tt = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+      if (tt > 0) {
+        g = g12[ii + i2 + perm[jj + j2 + perm[kk + k2]]];
+        tt *= tt;
+        n2 += tt * tt * (GRAD3[g] * x2 + GRAD3[g + 1] * y2 + GRAD3[g + 2] * z2);
+      }
+      tt = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
+      if (tt > 0) {
+        g = g12[ii + 1 + perm[jj + 1 + perm[kk + 1]]];
+        tt *= tt;
+        n2 += tt * tt * (GRAD3[g] * x3 + GRAD3[g + 1] * y3 + GRAD3[g + 2] * z3);
+      }
+      return 32 * n2;
+    };
+  }
 
   // src/universe/ending-timeline.js
   var IMPACT = 3.6;
@@ -28326,6 +28572,7 @@ void main() {
       sunBeacon: 0,
       planet: 0,
       cool: 0,
+      steam: 0,
       ocean: 0,
       clouds: 0,
       life: 0,
@@ -28353,7 +28600,14 @@ void main() {
   var BG_PARENT = [4 / 255, 7 / 255, 11 / 255];
   var BG_VOID = [1 / 255, 1.8 / 255, 2.6 / 255];
   var BG_WORLD = [3 / 255, 6 / 255, 9 / 255];
-  var LIFT = [0.663 * 0.018 + 4e-3, 0.906 * 0.018 + 0.012, 0.949 * 0.018 + 0.022];
+  var LIFT = [0, 0, 0];
+  function setSeedLift(tint) {
+    const t = tint && tint.length >= 3 && tint.every(Number.isFinite) ? tint : [1, 0.925, 0.874];
+    LIFT[0] = t[0] * 0.018 + 4e-3;
+    LIFT[1] = t[1] * 0.018 + 0.012;
+    LIFT[2] = t[2] * 0.018 + 0.022;
+  }
+  setSeedLift(null);
   function sampleFrame(f, t, reduced) {
     f.t = t;
     const after = t - IMPACT;
@@ -28413,11 +28667,12 @@ void main() {
     f.sun = smoothstep(21.6, 23.6, t);
     f.sunBeacon = smoothstep(21.8, 23.2, t) * (1 - smoothstep(24.6, 26.2, t));
     f.planet = smoothstep(24.6, 25.6, t);
-    f.cool = smoothstep(25.6, 27.8, t);
-    f.ocean = smoothstep(26.6, 29, t);
-    f.clouds = smoothstep(27.4, 29.8, t);
-    f.life = smoothstep(28.6, 30.6, t);
-    f.atmo = smoothstep(26.8, 29.6, t);
+    f.cool = smoothstep(26, 27.6, t);
+    f.steam = smoothstep(27.2, 28, t) * (1 - smoothstep(28.4, 29.4, t));
+    f.ocean = smoothstep(27.5, 29.2, t);
+    f.clouds = smoothstep(28, 29.8, t);
+    f.life = smoothstep(29.2, 30.8, t);
+    f.atmo = smoothstep(26.9, 29, t);
     f.shake = reduced ? 0 : pulse(t, IMPACT, 0.02, 0.32) * (t >= IMPACT ? 1 : 0);
     const flash = t >= IMPACT ? Math.exp(-after / 0.085) : 0;
     const flashGain = reduced ? 0.2 : 1;
@@ -28431,7 +28686,7 @@ void main() {
     f.aberration = 0.25 + (reduced ? 0 : 2.5 * pulse(t, IMPACT, 0.04, 0.3));
     f.grain = mix(0.022, 0.042, smoothstep(0.2, 2, t));
     f.curveMix = smoothstep(0.15, 2.2, t);
-    f.hueCurve = smoothstep(3.56, 3.72, t) * (1 - smoothstep(10.4, 12.2, t));
+    f.hueCurve = 0.45 * smoothstep(3.56, 3.72, t) * (1 - smoothstep(10.4, 12.2, t));
     f.scrim = smoothstep(0.3, 1.6, t) * (0.2 + 0.32 * smoothstep(3.56, 3.7, t) * (1 - smoothstep(8.8, 9.8, t)) + 0.1 * smoothstep(11, 13, t) * (1 - smoothstep(22, 24, t)));
     f.vignette = 0.3 + 0.12 * fall * (t <= IMPACT ? 1 : 0);
     const liftK = 1 - smoothstep(0.2, 1.8, t);
@@ -28759,47 +29014,55 @@ float snoise(vec3 v) {
 }
 `
   );
+  var v3 = (c) => `vec3(${c.map((x) => x.toFixed(4)).join(", ")})`;
+  var BB_GLSL = BB_TABLE.map(v3).join(",\n  ");
   var PALETTE = (
     /* glsl */
     `
-const vec3 P_WHITE = vec3(0.93, 0.985, 1.0);
-const vec3 P_HI = vec3(0.79, 0.965, 1.0);
-const vec3 P_ICE = vec3(0.45, 0.9, 1.0);
-const vec3 P_BLUE = vec3(0.18, 0.63, 1.0);
-const vec3 P_DEEP = vec3(0.12, 0.5, 1.0);
-const vec3 P_ABYSS = vec3(0.06, 0.35, 0.9);
+const vec3 BB[${BB_STEPS}] = vec3[${BB_STEPS}](
+  ${BB_GLSL}
+);
+vec3 blackbody(float T) {
+  float x = clamp(log(max(T, 1.0) / ${BB_MIN_K.toFixed(1)}) * ${((BB_STEPS - 1) / Math.log(BB_MAX_K / BB_MIN_K)).toFixed(6)}, 0.0, ${(BB_STEPS - 1).toFixed(1)});
+  float i = min(floor(x), ${(BB_STEPS - 2).toFixed(1)});
+  int k = int(i);
+  return mix(BB[k], BB[k + 1], x - i);
+}
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const vec3 H_ALPHA = vec3(1.0, 0.1, 0.14);
+const vec3 O_III = vec3(0.06, 0.78, 0.72);
+const vec3 REFLECTION = vec3(0.24, 0.44, 1.0);
+const vec3 DUST_LANE = vec3(0.42, 0.33, 0.25);
+const vec3 WEB = vec3(0.6, 0.7, 1.0);
+const vec3 K_SUN = ${v3(blackbodyExact(5800))};
+const vec3 K_POP3 = ${v3(blackbodyExact(4e4))};
+const vec3 K_BULGE = ${v3(blackbodyExact(4200))};
+const vec3 K_YOUNG = ${v3(blackbodyExact(11e3))};
+const vec3 K_WHITE = ${v3(blackbodyExact(6500))};
 `
   );
   var THERMAL = (
     /* glsl */
     `
+float kelvin(float k) { return 800.0 * pow(8.75, k); }
 vec3 thermal(float k) {
-  k = clamp(k, 0.0, 1.0);
-  // Luminance rises 0.035 \u2192 0.23 \u2192 0.55 \u2192 0.78 \u2192 0.93 (as the old ramp did); the hue stays put.
-  vec3 c0 = vec3(0.0092, 0.0385, 0.077);
-  vec3 c1 = vec3(0.073, 0.255, 0.405);
-  vec3 c2 = vec3(0.26, 0.607, 0.867);
-  vec3 c3 = vec3(0.43, 0.86, 0.954);
-  vec3 c4 = vec3(0.80, 0.95, 1.00);
-  if (k < 0.25) return mix(c0, c1, k / 0.25);
-  if (k < 0.5) return mix(c1, c2, (k - 0.25) / 0.25);
-  if (k < 0.75) return mix(c2, c3, (k - 0.5) / 0.25);
-  return mix(c3, c4, (k - 0.75) / 0.25);
+  k = clamp(k, 0.0, 1.15);
+  return blackbody(kelvin(k)) * (0.12 + 0.88 * min(k, 1.0));
 }
 `
   );
   var BURN = (
     /* glsl */
     `
+float kelvinB(float k) { return 800.0 * pow(8.75, k); }
+float burnRadiance(float k) { return (0.06 + 2.94 * k * k) * (0.55 + 0.45 * smoothstep(0.0, 0.45, k)); }
 vec3 burn(float k) {
   k = clamp(k, 0.0, 1.15);
-  vec3 c;
-  if (k < 0.3) c = mix(vec3(0.018, 0.105, 0.27), vec3(0.062, 0.26, 0.62), k / 0.3);
-  else if (k < 0.52) c = mix(vec3(0.062, 0.26, 0.62), vec3(0.1, 0.48, 1.03), (k - 0.3) / 0.22);
-  else if (k < 0.72) c = mix(vec3(0.1, 0.48, 1.03), vec3(0.24, 0.74, 1.2), (k - 0.52) / 0.2);
-  else if (k < 0.9) c = mix(vec3(0.24, 0.74, 1.2), vec3(0.5, 0.84, 1.0), (k - 0.72) / 0.18);
-  else c = mix(vec3(0.5, 0.84, 1.0), vec3(0.93, 0.98, 1.0), clamp((k - 0.9) / 0.2, 0.0, 1.0));
-  return c * (0.06 + 2.94 * k * k);
+  return blackbody(kelvinB(k)) * burnRadiance(k);
+}
+vec3 burnHot(float k) {
+  k = clamp(k, 0.0, 1.15);
+  return blackbody(kelvinB(k + 0.25)) * burnRadiance(k);
 }
 `
   );
@@ -28896,23 +29159,24 @@ void main() {
   // Dust lanes run along the inner (concave) edge of each arm, broken into patches.
   float lane = pow(0.5 + 0.5 * cos(phase + 0.6), 7.0) * smoothstep(0.1, 0.24, r) * smoothstep(1.0, 0.35, r)
              * smoothstep(0.25, 0.65, n);
-  // Star clouds, and (the brightest of them) cyan-white star-forming knots.
+  // Star clouds, and (the brightest of them) pink HII knots (star-forming regions: H-alpha).
   float fine = snoise(vec3(pr * 30.0, 4.1)) * 0.5 + 0.5;
   float clumps = smoothstep(0.55, 0.95, fine);
   float hii = smoothstep(0.86, 0.99, fine) * arm;
   float disk = exp(-r / ${(DISK_SCALE * 0.82).toFixed(3)}) * smoothstep(1.3, 0.85, r);
   float halo = exp(-r / 0.55) * 0.08;
   float bulge = exp(-pow(r / 0.07, 0.9)) + 0.2 * exp(-r / 0.14);
-  // A white-ice bulge, ice-blue arms, bright cyan-white knots.
-  vec3 core = P_HI * 0.86;
-  vec3 cool = vec3(0.5, 0.8, 1.0);
-  vec3 knot = vec3(0.68, 0.94, 1.0);
+  // As galaxies photograph: a yellowish bulge of old stars (~4 200 K), blue arms of young stars
+  // (~11 000 K) with blue reflection haze, pink HII knots (H-alpha with a little H-beta).
+  vec3 core = mix(K_BULGE, vec3(1.0, 0.9, 0.78), 0.5) * 0.9;
+  vec3 cool = mix(K_YOUNG, REFLECTION, 0.25);
+  vec3 knot = mix(H_ALPHA, vec3(1.0, 0.4, 0.6), 0.35);
   vec3 col = core * bulge * 1.3;
   col += mix(core * 0.5, cool, smoothstep(0.08, 0.42, r)) * (disk * (0.12 + 1.3 * (arm + spur) * (0.55 + 0.6 * n)) + halo);
   col += cool * clumps * (arm + spur) * disk * 0.9;
-  col += knot * hii * disk * 1.05;
-  // Dust lanes swallow the paler light first: dark, blue-grey.
-  col *= mix(vec3(1.0), vec3(0.34, 0.41, 0.47), lane);
+  col += knot * hii * disk * 1.5;
+  // Dust lanes absorb blue light first: brown-grey, reddening what shines through.
+  col *= mix(vec3(1.0), DUST_LANE * 0.55, lane);
   // A thin disk seen at a grazing angle is brighter (a longer path through it): from near the
   // plane it gathers toward the band across the sky.
   float dist = length(vView);
@@ -28947,34 +29211,27 @@ void main() {
   }
   function fillGalaxyStars(rand2, orbit, color, i0, i1) {
     const star = { r: 0, ang: 0, h: 0, kind: 0 };
+    const tint = [0, 0, 0];
     for (let i = i0; i < i1; i++) {
       sampleGalaxyStar(rand2, star);
       let bright, c0, c1, c2;
       if (star.kind === 0) {
         bright = (0.3 + rand2() * 0.45) * 0.85;
-        c0 = 0.84;
-        c1 = 0.95;
-        c2 = 1;
+        blackbody(3800 + rand2() * 1400, tint);
+        c0 = tint[0];
+        c1 = tint[1];
+        c2 = tint[2];
       } else {
         const young = star.kind === 1 && rand2() < 0.45;
         bright = young ? 0.32 + Math.pow(rand2(), 4) * 2.4 : 0.1 + rand2() * 0.22;
-        if (young) {
-          c0 = 0.55;
-          c1 = 0.82;
-          c2 = 1;
-        } else if (rand2() < 0.5) {
-          c0 = 0.84;
-          c1 = 0.93;
-          c2 = 1;
-        } else {
-          c0 = 0.72;
-          c1 = 0.87;
-          c2 = 1;
-        }
+        blackbody(young ? 9e3 + Math.pow(rand2(), 2) * 16e3 : 4500 + rand2() * 3e3, tint);
+        c0 = tint[0];
+        c1 = tint[1];
+        c2 = tint[2];
         if (young && rand2() < 0.06) {
-          c0 = 0.68;
-          c1 = 0.94;
-          c2 = 1;
+          c0 = 1;
+          c1 = 0.36;
+          c2 = 0.5;
           bright *= 1.3;
         }
       }
@@ -29419,21 +29676,26 @@ vec3 positionAt(vec4 s, vec4 c) {
   return p;
 }
 
-// The new universe's matter in the film's one hue family (ending-glsl.js PALETTE).
-const vec3 ICE = vec3(0.42, 0.80, 1.0);
-const vec3 COLD = vec3(0.82, 0.94, 1.0);
-const vec3 DEEP = P_DEEP;
-const vec3 GAS = vec3(0.16, 0.48, 1.0);
+// The new universe's matter, physically coloured (ending-glsl.js): thermal light by temperature
+// (blackbody), the gas and its web in survey / astrophotography colours.
+const vec3 ICE = vec3(0.41, 0.54, 1.0);   // the hottest field matter, ~20 000 K blue-white
+const vec3 COLD = vec3(1.0, 0.95, 0.92);  // ~6 000 K white
+const vec3 DEEP = vec3(0.6, 0.07, 0.0);   // cooled to a dull red glow (~1 100 K)
+const vec3 GAS = vec3(0.45, 0.5, 0.66);   // cold neutral gas: a dim blue-grey
+const vec3 NODE = vec3(1.0, 0.84, 0.64);  // dense nodes: old, yellowish starlight and hot gas
 
 // Colour (intensity included) and size factor of this particle at time t.
 // Before the impact: the reader's matter falling in.
 vec3 collapseLook(float t, float rad, out float size) {
   float u = clamp((t - hMeta.x) / (hMeta.y - hMeta.x), 0.0, 1.0);
   float heat = u * u;
-  // Falling matter accelerates and heats: ice \u2192 white-hot, brighter as it plunges.
-  vec3 hot = mix(vec3(0.55, 0.88, 1.0), vec3(0.85, 0.96, 1.0), heat);
-  // Settled matter glows by its orbit, like the disk: white-hot near the point, deep blue further out.
-  vec3 orbitCol = mix(P_HI, DEEP, smoothstep(0.35, 1.0, abs(hMeta.z)));
+  // Falling matter accelerates and heats (blackbody): orange \u2192 yellow \u2192 white, brighter as it
+  // plunges. The reader's far stars fall from furthest and are blueshifted as they fall.
+  vec3 hot = hMeta.z < 0.0 ? blackbody(mix(6500.0, 16000.0, heat)) : blackbody(mix(2200.0, 7000.0, heat));
+  // Settled matter glows by its orbit, like the disk (T \u221D r^-3/4): white-hot near the point,
+  // yellow, orange, a dull orange-red further out.
+  float ro = smoothstep(0.35, 1.0, abs(hMeta.z));
+  vec3 orbitCol = blackbody(6500.0 * pow(1.0 + 5.0 * ro, -0.75));
   float diskR = uC[0].x;
   // Each parcel keeps its light until it crosses into the disk, then gives it to the disk
   // (ending-core.js), so the swirl stays legible: space darkens because matter leaves it.
@@ -29451,8 +29713,8 @@ vec3 collapseLook(float t, float rad, out float size) {
 // After the impact: the new universe's matter.
 vec3 cosmosLook(float t, float g, out float size) {
   size = 1.0;
-  // Birth: sparks materialise out of the flash, white-hot, cooling through ice cyan to deep blue,
-  // then differentiating into fields (ice, cold white, deep blue).
+  // Birth: sparks materialise out of the flash, white-hot, cooling through yellow and orange to a
+  // dull red, then differentiating into fields (the hottest blue-white, white, a cooled red).
   float sp = aRnd.w;
   float age = t - IMPACT;
   vec3 hot = thermal(0.12 + 0.88 * uTemp + (sp - 0.5) * 0.12);
@@ -29467,28 +29729,35 @@ vec3 cosmosLook(float t, float g, out float size) {
   float c = clusterOf(g);
   float isNode = step(0.5, aWeb.w);
   float voidDim = mix(1.0, 0.3, step(aWeb.w, -0.5));
-  vec3 gasTint = mix(GAS, ICE, 0.35 + 0.4 * aRnd.z);
+  // The dark ages are a dim neutral grey; as gravity gathers the gas the filaments light a neutral
+  // blue (the cosmic web as surveys render it) and the nodes a yellowish white (voids stay dim).
+  float isVoid = step(aWeb.w, -0.5);
+  vec3 webTint = mix(mix(WEB, GAS, 0.25 + 0.4 * aRnd.z), mix(WEB, NODE, 0.7 + 0.3 * aRnd.z), isNode);
+  vec3 gasTint = mix(GAS, mix(webTint, GAS, isVoid), smoothstep(0.15, 0.85, c));
   // Dim while spread out, brightening as gravity gathers it: dark voids, legible knots.
   vec3 gas = gasTint * (0.14 + 0.82 * c + 0.08 * c * isNode) * (0.5 + aRnd.y) * voidDim;
   col = mix(col, gas, smoothstep(8.4, 11.0, t));
-  // Heavy elements from the first supernovae light the gas: it brightens and pales toward ice-white.
+  // Heavy elements from the first supernovae enrich the gas: it brightens and pales toward white,
+  // a touch of O-III teal in it.
   float enr = smoothstep(aStar.z, aStar.z + 2.4, t);
-  col = mix(col, P_HI * dot(col, vec3(0.45)), enr * 0.6);
+  col = mix(col, vec3(0.78, 0.92, 0.95) * dot(col, vec3(0.45)), enr * 0.5);
   // Stars.
   if (aStar.w != 0.0 && t > aStar.x) {
     float age = t - aStar.x;
     float ign = smoothstep(0.0, 0.18, age);
     float b = abs(aStar.w);
-    // The first generation burns blue-white; the second (enriched) a paler ice-white.
-    vec3 sc = aStar.w > 0.0 ? vec3(0.6, 0.86, 1.0) : vec3(0.88, 0.97, 1.0);
+    // The first generation (Population III: massive, metal-free, ~40 000 K) burns blue-white; the
+    // second (enriched, lighter) sun-like, a yellow-white.
+    vec3 sc = aStar.w > 0.0 ? mix(K_POP3, vec3(1.0), 0.25) : blackbody(5400.0);
     // Ignition: a short, bright flare (the first light of the first stars), then a steady glow.
     vec3 st = sc * b * (1.4 + 11.0 * exp(-age * 2.2)) * ign;
     float twinkle = 0.85 + 0.15 * sin(t * (2.0 + aRnd.z * 3.0) + aRnd.y * 6.28);
     st *= twinkle;
     if (t > aStar.y) {
       float sa = t - aStar.y;
-      // A supernova: a white-hot flash, then a slow deep-blue afterglow.
-      st = P_WHITE * b * 16.0 * exp(-sa * 2.6) + P_BLUE * b * 0.25 * exp(-sa * 0.5);
+      // A supernova: a blue-white flash (~15 000 K), then a slow afterglow \u2014 its remnant's H-alpha
+      // filaments (pink-red) around a faint O-III (teal) interior.
+      st = blackbody(15000.0) * b * 16.0 * exp(-sa * 2.6) + (H_ALPHA * 0.26 + O_III * 0.07) * b * exp(-sa * 0.5);
       size *= 1.0 + 1.5 * exp(-sa * 1.5);
     }
     col = col * 0.25 + st;
@@ -29874,21 +30143,25 @@ void main() {
 uniform float uIntensity;
 uniform float uTint;
 uniform float uTime;
+uniform vec3 uSeedCore;   // the seed's own core / halo tints (largest channel 1), from its glow
+uniform vec3 uSeedHalo;
 varying vec2 vP;
 varying float vEnergy;
 ${PALETTE}
 void main() {
   float r = length(vP);
-  // A soft, gradient-lit core (white-hot at the centre, ice outward) rather than a clipped disc:
+  // A soft, gradient-lit core (white at the centre, the seed's tint outward) rather than a clipped disc:
   // a smooth power-law profile whose peak stays near the tone curve's shoulder.
   float core = 1.0 / ((1.0 + r * r * 1.4) * (1.0 + r * r * 1.4));
   float halo = 0.12 / (1.0 + r * r * 1.2);
   float wide = 0.03 * exp(-r * 0.4);
-  // uTint: the seed's own ice tint as the engine drew it (1), turning white-hot toward the impact (0).
-  vec3 coreCol = mix(P_HI, P_WHITE, core);
-  vec3 col = mix(coreCol, mix(coreCol, P_ICE, 0.45), uTint) * core * 2.2
-           + mix(P_WHITE * 0.7, P_ICE * 0.9, uTint) * halo
-           + mix(P_BLUE, P_ICE * 0.6, uTint) * wide;
+  // uTint: the seed's own tint as the engine drew it (1). Toward the impact (0) everything falls
+  // in and the point heats past white: a white core in a faint blue-white (~12 000 K) glow.
+  vec3 hot = blackbody(12000.0);
+  vec3 coreCol = mix(mix(hot, vec3(1.0), core), mix(uSeedCore, vec3(1.0), core * 0.6), uTint);
+  vec3 col = mix(coreCol, mix(coreCol, uSeedHalo, 0.45), uTint) * core * 2.2
+           + mix(mix(hot, vec3(1.0), 0.5) * 0.7, uSeedHalo * 0.9, uTint) * halo
+           + mix(hot * 0.5, uSeedHalo * 0.6, uTint) * wide;
   // A faint, slow shimmer: the seed is alive, never a static dot.
   col *= 1.0 + 0.05 * sin(uTime * 7.0 + r * 0.8);
   col *= smoothstep(${CORE_EXTENT.toFixed(1)}, ${(CORE_EXTENT * 0.6).toFixed(1)}, r);
@@ -29934,9 +30207,13 @@ void main() {
 `
   );
   var DEFAULT_SEED_LIGHT = Object.freeze([
-    Object.freeze({ scale: 0.79, intensity: 0.6, core: [0.791, 0.965, 1], halo: [0.397, 0.799, 0.888], rays: 0.3 }),
-    Object.freeze({ scale: 2.42, intensity: 0.112, core: [0, 0, 0], halo: [0.2375, 0.537, 0.661], rays: 0 })
+    Object.freeze({ scale: 0.79, intensity: 0.6, core: [1, 0.941, 0.919], halo: [1, 0.843, 0.731], rays: 0.3 }),
+    Object.freeze({ scale: 2.42, intensity: 0.08, core: [0, 0, 0], halo: [1, 0.773, 0.58], rays: 0 })
   ]);
+  var tintOf = (c, fallback) => {
+    const m = c ? Math.max(Number(c[0]) || 0, Number(c[1]) || 0, Number(c[2]) || 0) : 0;
+    return m > 1e-4 ? [c[0] / m, c[1] / m, c[2] / m] : fallback;
+  };
   var SEED_GLOWS = 2;
   var DISK_VERT = (
     /* glsl */
@@ -29997,15 +30274,20 @@ void main() {
   // Trailing lanes with dark gaps between them.
   float streaks = smoothstep(-0.25, 0.75, n);
   float ring = smoothstep(0.08, 0.24, r) * (1.0 - smoothstep(0.55, 1.0, r));
-  // Relativistic beaming: the side moving toward the camera is brighter.
+  // A thin accretion disk's temperature falls as r^-3/4 (Shakura\u2013Sunyaev): white-hot at the inner
+  // edge (~7 500 K), yellow-white, orange, an ember-red rim (~1 650 K at r = 1). The brighter
+  // lanes run a little hotter.
+  float T = 7500.0 * pow(max(r, 0.13) / 0.13, -0.75) * (0.88 + 0.24 * streaks);
+  // Relativistic Doppler: the side orbiting toward the camera is blueshifted (hotter-looking) and
+  // beamed brighter (\u221D \u03B4\xB3), the receding side redder and dimmer. Orbital speed \u221D r^-1/2.
   vec2 tangent = vec2(-sin(th), cos(th));
-  float beam = 1.0 + 0.7 * dot(tangent, uBeam);
-  // White-hot inside, ice through the middle, a saturated deep blue at the rim (no warm skirt).
-  vec3 inner = P_WHITE;
-  vec3 mid = P_ICE * 0.93;
-  vec3 outer = P_DEEP;
-  vec3 col = mix(inner * 1.8, mid, smoothstep(0.15, 0.45, r));
-  col = mix(col, outer, smoothstep(0.45, 0.9, r));
+  float beta = 0.42 * pow(max(r, 0.13) / 0.13, -0.5);
+  float delta = clamp(1.0 / (1.0 - beta * dot(tangent, uBeam)), 0.55, 1.7);
+  vec3 col = blackbody(T * delta);
+  // Surface brightness (a gentler stand-in for T\u2074, so the outer disk still reads); the cooler
+  // outer disk keeps enough light to glow like embers rather than dim to brown.
+  col *= mix(1.8, 0.85, smoothstep(0.15, 0.45, r)) * mix(1.0, 0.45, smoothstep(0.45, 0.95, r));
+  float beam = delta * delta * delta;
   float e = ring * (0.25 + 0.75 * streaks) * streaks * beam * (1.0 + 2.5 * exp(-r * 7.0));
   gl_FragColor = vec4(col * e * uOpacity, 1.0);
 }
@@ -30020,7 +30302,9 @@ void main() {
       uProjScale: { value: 1e3 },
       uIntensity: { value: 1 },
       uTint: { value: 1 },
-      uTime: { value: 0 }
+      uTime: { value: 0 },
+      uSeedCore: { value: new Vector3(1, 0.941, 0.919) },
+      uSeedHalo: { value: new Vector3(1, 0.843, 0.731) }
     };
     const coreMaterial = new ShaderMaterial({
       vertexShader: CORE_VERT,
@@ -30087,6 +30371,10 @@ void main() {
         u.uHalo.value.fromArray(ok && L.halo ? L.halo : [0, 0, 0]);
         u.uRays.value = ok ? Number(L.rays) || 0 : 0;
       }
+      const first = list.find((L) => L && Number(L.intensity) > 0 && Number(L.scale) > 0) || DEFAULT_SEED_LIGHT[0];
+      const halo = tintOf(first.halo, [1, 0.843, 0.731]);
+      coreUniforms.uSeedHalo.value.fromArray(halo);
+      coreUniforms.uSeedCore.value.fromArray(tintOf(first.core, halo));
     }
     setLight(null, 0.09);
     function update(frame2, view, cameraPosition) {
@@ -30166,7 +30454,8 @@ void main() {
   b *= (1.0 + 1.8 * pull) * (1.0 - smoothstep(0.86, 1.0, x));
   float size = mix(2.6, 1.0, m) * uPixelRatio;
   gl_PointSize = size;
-  vColor = mix(aStar.rgb, vec3(0.7, 0.88, 1.0), pull) * b * uIntensity;
+  // (Falling toward the singularity their light is blueshifted.)
+  vColor = mix(aStar.rgb, vec3(0.6, 0.72, 1.0), pull) * b * uIntensity;
 }
 `
   );
@@ -30182,9 +30471,13 @@ void main() {
 }
 `
   );
-  var TINT_A = [0.8, 0.92, 1];
-  var TINT_B = [0.62, 0.84, 1];
-  var TINT_C = [0.5, 0.78, 1];
+  var STAR_TINT = [0, 0, 0];
+  function starTint(k, j) {
+    const T = k < 0.58 ? 4600 + j * 2400 : k < 0.84 ? 7e3 + j * j * 8e3 : 3300 + j * 1200;
+    blackbody(T, STAR_TINT);
+    for (let c = 0; c < 3; c++) STAR_TINT[c] = STAR_TINT[c] * 0.6 + 0.4;
+    return STAR_TINT;
+  }
   function* buildSky(count, seed2, bandNormal, chunk = 3e3) {
     const rand2 = rng(seed2);
     const pos = new Float32Array(count * 3);
@@ -30215,7 +30508,7 @@ void main() {
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = z;
       const k = rand2();
-      const tint = k < 0.62 ? TINT_A : k < 0.86 ? TINT_B : TINT_C;
+      const tint = starTint(k, rand2());
       star[i * 4] = tint[0];
       star[i * 4 + 1] = tint[1];
       star[i * 4 + 2] = tint[2];
@@ -30243,6 +30536,7 @@ uniform float uIntensity, uGrainScale;
 varying vec2 vUv;
 ${HASH}
 ${SIMPLEX}
+${PALETTE}
 float fbm3(vec3 p) { return snoise(p) * 0.55 + snoise(p * 2.1 + 3.7) * 0.3 + snoise(p * 4.3 - 1.9) * 0.15; }
 // Fine stars fixed to the sky: one candidate per cell of a direction-space grid.
 float grain(vec3 rd, float density) {
@@ -30267,14 +30561,20 @@ void main() {
   float clouds = smoothstep(-0.25, 0.75, fbm3(rd * 7.0 + 3.0));
   float rift = smoothstep(0.0, 0.5, fbm3(rd * 5.5 + 13.0) * 0.5 + 0.5 + 0.15 * snoise(rd * 21.0));
   float lane = rift * exp(-pow((e + 0.008) / (w * 0.42), 2.0));
-  float dust = 1.0 - 0.88 * lane;
-  vec3 cool = vec3(0.6, 0.8, 1.0);
-  vec3 pale = vec3(0.8, 0.94, 1.0) * 0.92;
-  vec3 tint = mix(cool, pale, smoothstep(0.3, 1.0, toward) * 0.7);
-  float diffuse = (strip * (0.18 + 0.82 * clouds) + wide * 0.1 + core * 0.9) * dust;
-  float density = clamp((strip * (0.2 + 0.8 * clouds * clouds) + wide * 0.05) * dust, 0.0, 1.0) * 0.4 + 0.0015;
+  // Dust rifts absorb blue first: the light through their edges is reddened, brown-grey.
+  vec3 dust = mix(vec3(1.0), DUST_LANE * 0.3, lane * 0.95);
+  // The band as a long exposure shows it: a neutral, faintly warm white out along the disk (the
+  // integrated light of ordinary stars), yellower toward the galaxy's centre (its old bulge).
+  vec3 cool = vec3(0.86, 0.88, 0.95);
+  vec3 pale = mix(K_BULGE, vec3(1.0), 0.45) * 0.95;
+  vec3 tint = mix(cool, pale, smoothstep(0.3, 1.0, toward) * 0.8);
+  // A few faint pink HII knots along the star clouds.
+  float knots = smoothstep(0.78, 0.95, snoise(rd * 38.0 + 5.0) * 0.5 + 0.5) * strip * clouds;
+  float diffuse = strip * (0.18 + 0.82 * clouds) + wide * 0.1 + core * 0.9;
+  float dustL = dot(dust, vec3(0.3333));
+  float density = clamp((strip * (0.2 + 0.8 * clouds * clouds) + wide * 0.05) * dustL, 0.0, 1.0) * 0.4 + 0.0015;
   float stars = grain(rd, density) + grain(rd * 1.7 + 0.31, density * 0.6) * 0.5;
-  vec3 col = tint * (diffuse * 0.055 + stars * 0.42);
+  vec3 col = tint * dust * diffuse * 0.055 + tint * stars * 0.42 + mix(H_ALPHA, vec3(1.0, 0.45, 0.6), 0.4) * knots * 0.012;
   gl_FragColor = vec4(col * uIntensity, 1.0);
 }
 `
@@ -30457,7 +30757,7 @@ vec3 plasma(vec3 ro, vec3 rd) {
   vec3 acc = vec3(0.0);
   float trans = 1.0;
   // Sight lines through the middle reach the hot core; toward the limb they only graze the
-  // cooler outer layers: a white-hot core burning out through ice cyan into deep blue.
+  // cooler outer layers: a white-hot core burning out through yellow and orange into a red limb.
   float mu = 1.0;
   if (outside) {
     float miss = sqrt(max(dot(ro, ro) - b * b, 0.0)) / max(rho, 1e-5);
@@ -30487,15 +30787,18 @@ vec3 plasma(vec3 ro, vec3 rd) {
     float glow = 0.3 + 0.7 * smoothstep(-0.55, 0.6, n);
     float threads = fil * 4.0 + smoothstep(0.3, 0.9, n) * 0.1;
     float dens = mix(glow, mix(threads, glow, uFill), phase) * edge;
-    // The supercooled false vacuum sinks to a dimmer, deeper blue; the reheated true vacuum inside
+    // The supercooled false vacuum sinks to a dimmer, redder glow; the reheated true vacuum inside
     // the bubbles burns hotter (paler, brighter).
     float k = uTemp + 0.24 * n - coreHeat - 0.22 * smoothstep(0.8, 1.08, rn) - uSupercool * (1.0 - phase) + 0.14 * min(fil * 3.0, 1.0);
+    // As the fireball hands over to the threads it fades by cooling (orange, red) as it dims.
+    k -= 0.4 * (1.0 - uPlasma);
     float fresh = bw.x * (1.0 - uBubbleDone);
     vec3 src = burn(k) * (1.0 + 0.9 * fresh);
     float kap = uKappa * mix(1.0, 0.3, fresh);
     float front = exp(-fi * 1.2);
-    // The bubble walls: a thin, bright, ice-white front where the latent heat is released.
-    vec3 wall = P_HI * bw.y * uWall * edge;
+    // The bubble walls: a thin front where the latent heat is released \u2014 hotter than anything
+    // around it, white (~8 000 K; a bluer front over the orange would read violet).
+    vec3 wall = mix(blackbody(8000.0), vec3(1.0), 0.4) * 0.8 * bw.y * uWall * edge;
     acc += trans * (src * dens + wall) * dt * front;
     trans *= exp(-kap * dens * dt);
     if (trans < 0.02) break;
@@ -30526,10 +30829,12 @@ vec3 gas(vec3 ro, vec3 rd) {
     float col = (exp(-b2 / s2) * 0.62 + exp(-b2 / (s2 * 6.0)) * 0.38 / 6.0) * (0.5 + 0.5 * tanh(1.15 * tc / sig)) * sqrt(sig) * 2.5 / s2;
     // Not over the lens: a cloud the camera is inside only lifts the haze.
     col *= smoothstep(sig * 0.6, sig * 2.2, length(v));
-    // Cold gas: deep blue in the small knots, paler ice in the massive ones.
-    vec3 tint = mix(P_DEEP, vec3(0.5, 0.82, 1.0), kb.z);
-    // The first stars light the densest knots once they ignite: their gas brightens toward ice-white.
-    tint = mix(tint, P_HI * 1.15, uGasLit * x * kb.z);
+    // Cold neutral gas: barely there, a dim neutral blue-grey (it only scatters faint light).
+    vec3 tint = mix(vec3(0.3, 0.32, 0.42), WEB * 0.9, kb.z);
+    // The first stars ionise the densest knots once they ignite: HII regions glow H-alpha pink-red,
+    // with a teal O-III core where the gas is hottest (the massive knots).
+    vec3 hii = mix(H_ALPHA, mix(H_ALPHA, O_III, 0.55), smoothstep(0.55, 1.0, kb.z) * x) * 1.1;
+    tint = mix(tint, hii, uGasLit * x * kb.z);
     acc += tint * col * kb.x * (0.35 + 0.65 * x);
   }
   return acc;
@@ -30558,8 +30863,8 @@ ${SIMPLEX}
 ${PALETTE}
 ${BURN}
 
-// The second family of strands (differentiation): pale ice, white at the core.
-const vec3 ICE = vec3(0.36, 0.82, 1.0);
+// The second family of strands (differentiation): the hottest, blue-white (~20 000 K).
+const vec3 ICE = vec3(0.41, 0.54, 1.0);
 
 // A strand's cross-section: a thin core and a short skirt (fainter, so it burns a deeper blue).
 float strand(float x, float wc, float hw) {
@@ -30571,12 +30876,13 @@ void main() {
   vec3 rd = normalize(uCamFwd + ndc.x * uTan.x * uCamRight + ndc.y * uTan.y * uCamUp);
   vec3 col = vec3(0.0);
   float d = uNear;
-  // Incandescence: a strand's temperature follows its brightness \u2014 white-hot where it blazes,
-  // ice cyan, then deep blue toward its faint parts and edges. The whole web cools with time.
+  // Incandescence (blackbody): a strand's temperature follows its brightness \u2014 white where it
+  // blazes, yellow and orange, then a dull red toward its faint parts and edges. The whole web
+  // cools with time.
   float kBase = mix(0.24, 0.04, uCool);
   float kSpan = mix(0.98, 0.7, uCool);
   // Strands run in braided bundles (iso-lines of one field at a few levels); as the plasma thins
-  // the outer strands fade, and pale ice strands appear between the cooling deep-blue ones
+  // the outer strands fade, and blue-white strands (the hottest) appear between the cooling red ones
   // (differentiation).
   const float LEVEL = 0.1;
   for (int k = 0; k < SHELLS; k++) {
@@ -30612,7 +30918,12 @@ void main() {
     float att = gate * edge * crowd * bead * focus * (1.0 - 0.08 * fk);
     float lum = min(hotV, 1.6) * along;
     // Farther strands are a little cooler (the eye reads them as deeper).
-    vec3 hot = burn(kBase + kSpan * min(lum, 1.15) - 0.03 * fk) * lum;
+    // Two populations burn side by side, region by region (the warp field, free here): most bundles
+    // at one temperature scale (white cores, yellow-orange bodies, red skirts), about a third
+    // hotter (blue-white cores, yellow-white bodies, orange skirts).
+    float kk = kBase + kSpan * pow(min(lum, 1.15), 1.6) - 0.03 * fk;
+    float fam = smoothstep(0.08, 0.34, w1);
+    vec3 hot = mix(burn(kk), burnHot(kk), fam) * lum;
     float li = iceV * along;
     vec3 ice = (ICE + vec3(0.6) * li * li) * li * 1.25;
     col += (hot * (1.0 - 0.35 * uDiff) + ice * uDiff * smoothstep(-0.4, 0.4, 0.15 - n)) * att;
@@ -30783,21 +31094,22 @@ ${PALETTE}
 void main() {
   float r = length(vP);
   vec3 col = vec3(0.0);
-  // Photosphere of a hot, blue-white star: white-hot at the centre, limb-darkened into ice,
-  // faintly granulated when resolved.
+  // Photosphere of a sun-like star (5800 K), limb-darkened: toward the limb we see higher,
+  // cooler layers (~4 500 K), so it dims and reddens; faintly granulated when resolved.
   if (r < 1.0) {
     float mu = sqrt(1.0 - r * r);
     float limb = 0.4 + 0.6 * mu;
     float gran = 1.0 + 0.06 * snoise(vec3(vP * 9.0, uTime * 0.3)) * smoothstep(8.0, 40.0, vPx);
-    col += mix(vec3(0.62, 0.86, 1.0), P_WHITE, mu) * 6.4 * limb * gran;
+    col += blackbody(mix(4500.0, 6100.0, mu)) * 6.4 * limb * gran;
   }
   float e = max(r - 1.0, 0.0);
-  // Corona and a wide, soft scattering halo, ice blue (no flares, no rings).
-  col += vec3(0.6, 0.86, 1.0) * (1.2 * exp(-e * 4.0) + 0.06 / (1.0 + e * e * 0.5)) * step(1.0, r);
+  // Corona and a wide, soft scattering halo: the photosphere's light, a little warmer as it is
+  // scattered (no flares, no rings).
+  col += mix(K_SUN, blackbody(4800.0), 0.5) * (1.2 * exp(-e * 4.0) + 0.06 / (1.0 + e * e * 0.5)) * step(1.0, r);
   col *= smoothstep(${SUN_EXTENT.toFixed(1)}, ${(SUN_EXTENT * 0.55).toFixed(1)}, r);
   // While it is still a distant point, the star is lit up for the eye to find.
   float point = exp(-r * r * 0.6) * uBeacon * 20.0;
-  gl_FragColor = vec4((col * vEnergy + vec3(0.85, 0.96, 1.0) * point) * uIntensity, 1.0);
+  gl_FragColor = vec4((col * vEnergy + K_SUN * point) * uIntensity, 1.0);
 }
 `
   );
@@ -30820,90 +31132,62 @@ void main() {
     /* glsl */
     `
 uniform vec3 uSunV;       // direction to the sun, view space
-uniform vec3 uSunO;       // direction to the sun, planet (object) space
-uniform float uCool, uOcean, uClouds, uLife, uTime, uOpacity, uCloudSpin;
+uniform float uCool, uSteam, uOcean, uClouds, uLife, uTime, uOpacity, uCloudSpin;
 varying vec3 vObj;
 varying vec3 vView;
 varying vec3 vNormalV;
-${SIMPLEX}
+uniform sampler2D tSurf;    // baked (bakePlanetSurface): terrain height, ridges, rock grain, moisture
+uniform sampler2D tDetail;  // baked: polar-cap edge noise, plankton field, convection cells, fine seams
+uniform sampler2D tAir;     // baked: cloud pattern (cyclones included), its streaks, magma churn
 ${PALETTE}
-float fbm(vec3 p, int oct) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 6; i++) { if (i >= oct) break; v += a * snoise(p); p = p * 2.05 + 1.3; a *= 0.5; }
-  return v;
-}
+// Equirectangular lookup of a direction (the baked fields are functions of direction).
+vec2 eq(vec3 d) { return vec2(atan(d.z, d.x) * 0.15915494 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.31830989 + 0.5); }
 vec3 spin(vec3 p, float a) {
   float c = cos(a), s = sin(a);
   return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
 }
-// A log-spiral cyclone centred on c (unit), turning with the hemisphere: cover in 0..1.
-float cyclone(vec3 p, vec3 c, float radius) {
-  vec3 t1 = normalize(cross(c, vec3(0.0, 1.0, 0.0)));
-  vec3 t2 = cross(c, t1);
-  vec3 d = p - c * dot(p, c);
-  float u = dot(d, t1), v = dot(d, t2);
-  float r = length(vec2(u, v)) / radius;
-  if (r > 1.6) return 0.0;
-  float th = atan(v, u) * sign(c.y);
-  float arms = 0.5 + 0.5 * cos(2.0 * (th + 2.6 * log(r + 0.04)));
-  float eye = smoothstep(0.03, 0.09, r);
-  return pow(arms, 1.6) * exp(-r * r * 1.6) * eye * 1.3;
-}
-// Cloud cover: a thin equatorial band, clear subtropics, streaky storm belts stretched along
-// the parallels, two cyclones; fine broken cells.
-float clouds(vec3 cp) {
-  float y = cp.y;
-  float lat = abs(y);
-  float itcz = exp(-pow(y / 0.06, 2.0)) * 0.34;
-  float belts = smoothstep(0.56, 0.66, lat) * (1.0 - smoothstep(0.78, 0.88, lat)) * 0.42;
-  float subtropic = smoothstep(0.22, 0.32, lat) * (1.0 - smoothstep(0.42, 0.52, lat));
-  vec3 cw = cp + 0.08 * vec3(snoise(cp * 3.0 + 1.0), snoise(cp * 3.0 + 6.0), snoise(cp * 3.0 + 11.0));
-  // Stretched along longitude (a squeezed latitude axis): streaks, not cotton balls.
-  float streak = fbm(cw * vec3(2.2, 7.5, 2.2) + vec3(0.0, 0.0, uTime * 0.006), 4);
-  float cells = fbm(cw * 11.0 + 3.0, 3);
-  float base = 0.14 + itcz + belts - 0.24 * subtropic;
-  // Bands are broken up by the streaks themselves, never solid stripes.
-  float c = base * (0.55 + 0.9 * smoothstep(-0.3, 0.4, streak)) + streak * 0.5 + cells * 0.22;
-  c = max(c, cyclone(cp, normalize(vec3(0.55, 0.62, 0.56)), 0.26));
-  c = max(c, cyclone(cp, normalize(vec3(-0.62, -0.58, 0.52)), 0.2) * 0.9);
-  return smoothstep(0.38, 0.8, c - 0.3 * (1.0 - uClouds)) * uClouds;
+// Cloud cover from the baked pattern: a thin equatorial band, clear subtropics, streaky storm
+// belts stretched along the parallels, two cyclones, fine broken cells (see bakePlanetSurface).
+float clouds(vec4 air) {
+  return smoothstep(0.38, 0.8, air.x - 0.3 * (1.0 - uClouds)) * uClouds;
 }
 void main() {
   vec3 n = normalize(vObj);
   float lat = abs(n.y);
-  // Terrain: continents from a low-frequency field under a light warp, eroded coasts, and
-  // ridged mountain belts along the continental margins.
-  vec3 w = n + 0.12 * vec3(snoise(n * 2.0 + 4.0), snoise(n * 2.0 + 9.0), snoise(n * 2.0 - 3.0));
-  float cont = snoise(w * 1.2) * 0.6 + snoise(w * 2.4 + 7.0) * 0.26;
-  float erosion = fbm(n * 7.0 + 2.0, 4) * 0.16 + snoise(n * 26.0) * 0.03;
-  float h = cont + erosion;
-  float ridge = pow(1.0 - abs(snoise(n * 5.2 + 2.0)), 6.0);
-  float margin = smoothstep(0.08, 0.2, cont) * (1.0 - smoothstep(0.3, 0.55, cont));
-  h += 0.22 * ridge * margin;
-  float sea = mix(-0.9, -0.02, uOcean);
+  // Terrain (baked): continents under a light warp, eroded coasts, ridged mountain belts along
+  // the continental margins.
+  vec4 surf = texture2D(tSurf, eq(n));
+  vec4 detail = texture2D(tDetail, eq(n));
+  float h = surf.x;
+  float ridge = surf.y;
+  float sea = mix(-0.42, 0.0, pow(uOcean, 0.8));
   float water = smoothstep(sea + 0.006, sea - 0.006, h);
   float depthW = clamp((sea - h) / 0.3, 0.0, 1.0);
 
-  // Land: dark basalt slate in the lowlands, blue-grey uplands, paler dry belts, bare ranges,
-  // snow on the highest peaks. Life darkens the moist lowlands to a deeper slate-blue.
+  // Land (linear albedo, as Earth's): young dark basalt, weathering to grey-brown rock; tan dry
+  // belts; grey ranges with snow on the highest peaks; once life has come, green moist lowlands.
   float relief = h - sea;
   float dry = smoothstep(0.2, 0.32, lat) * (1.0 - smoothstep(0.45, 0.58, lat));
-  vec3 land = mix(vec3(0.035, 0.045, 0.056), vec3(0.1, 0.12, 0.14), smoothstep(0.0, 0.25, relief));
-  land = mix(land, vec3(0.17, 0.2, 0.23), dry * 0.55 * (1.0 - smoothstep(0.2, 0.4, relief)));
-  land = mix(land, vec3(0.22, 0.25, 0.28), smoothstep(0.22, 0.4, relief) * ridge);
-  land = mix(land, vec3(0.76, 0.82, 0.87), smoothstep(0.4, 0.5, relief) * uOcean);
-  float moist = snoise(n * 2.6 + 7.0) * 0.5 + 0.5;
-  float life = uLife * smoothstep(0.4, 0.7, moist) * (1.0 - dry) * smoothstep(0.85, 0.35, lat) * (1.0 - smoothstep(0.12, 0.3, relief));
-  land = mix(land, land * vec3(0.5, 0.66, 0.82), life * 0.8);
-  // Open ocean is a deep blue; shelves along the coasts are a little lighter.
-  vec3 ocean = mix(vec3(0.008, 0.035, 0.06), vec3(0.004, 0.018, 0.044), smoothstep(0.0, 0.35, depthW));
-  // Life in the sea: faint ice-cyan blooms swirl over the shallow shelves.
-  float bloom = smoothstep(0.62, 0.92, snoise(n * 7.0 + vec3(0.0, 0.0, uTime * 0.003)) * 0.5 + 0.5 + 0.25 * snoise(n * 19.0));
-  ocean += vec3(0.02, 0.07, 0.085) * bloom * uLife * (1.0 - smoothstep(0.05, 0.4, depthW));
+  float grain = surf.z;
+  vec3 basalt = vec3(0.022, 0.02, 0.018) * (0.75 + 0.5 * grain);
+  vec3 rock = mix(vec3(0.11, 0.095, 0.08), vec3(0.17, 0.15, 0.13), grain);
+  vec3 land = mix(basalt, rock, uOcean * smoothstep(-0.05, 0.25, relief));
+  land = mix(land, vec3(0.26, 0.2, 0.13) * (0.85 + 0.3 * grain), dry * uOcean * 0.6 * (1.0 - smoothstep(0.2, 0.4, relief)));
+  land = mix(land, vec3(0.2, 0.19, 0.18), smoothstep(0.22, 0.4, relief) * ridge);
+  land = mix(land, vec3(0.78, 0.8, 0.83), smoothstep(0.4, 0.5, relief) * uOcean);
+  float moist = surf.w;
+  float life = uLife * smoothstep(0.3, 0.6, moist) * (1.0 - 0.7 * dry) * smoothstep(0.85, 0.35, lat) * (1.0 - smoothstep(0.15, 0.32, relief));
+  vec3 green = mix(vec3(0.035, 0.06, 0.022), vec3(0.08, 0.1, 0.04), grain);
+  land = mix(land, green, life * 0.85);
+  // Open ocean is a deep blue; shelves along the coasts are a little lighter and greener.
+  vec3 ocean = mix(vec3(0.006, 0.03, 0.05), vec3(0.003, 0.012, 0.04), smoothstep(0.0, 0.35, depthW));
+  // Life in the sea: faint plankton blooms swirl over the shallow shelves (teal).
+  float bloom = smoothstep(0.62, 0.92, detail.y);
+  ocean += vec3(0.008, 0.04, 0.035) * bloom * uLife * (1.0 - smoothstep(0.05, 0.4, depthW));
   vec3 albedo = mix(land, ocean, water);
   // A small polar cap with a broken edge.
-  float ice = smoothstep(0.93, 0.965, lat + 0.035 * snoise(n * 8.0) + 0.02 * snoise(n * 23.0)) * uOcean;
-  albedo = mix(albedo, vec3(0.76, 0.84, 0.9), ice);
+  float ice = smoothstep(0.93, 0.965, lat + detail.x) * uOcean;
+  albedo = mix(albedo, vec3(0.75, 0.78, 0.82), ice);
 
   vec3 N = normalize(vNormalV);
   vec3 V = normalize(-vView);
@@ -30911,13 +31195,23 @@ void main() {
   float ndl = dot(N, L);
   float diff = max(ndl, 0.0);
   float soft = smoothstep(-0.08, 0.2, ndl);
-  // Light of a blue-white star.
-  vec3 sunlight = vec3(0.9, 0.96, 1.0) * 2.8;
-  // Clouds drift faster than the ground; their shadows fall a little away from the sun.
+  // Light of a sun-like star (5800 K), half white-balanced the way a camera would: yellow-white.
+  vec3 sunlight = mix(K_SUN, vec3(1.0), 0.55) * 2.8;
+  // Clouds drift faster than the ground and shade it. While the crust is young, steam gathers into
+  // broken, streaky bands (uSteam) \u2014 never a uniform veil \u2014 until the seas take the water down.
   vec3 cp = spin(n, uCloudSpin);
-  float cover = clouds(cp);
-  vec3 so = normalize(uSunO);
-  float shadow = clouds(spin(normalize(n - so * 0.018), uCloudSpin));
+  // The molten surface's convection cells (slowly turning over) and fine seams.
+  vec4 molten = texture2D(tDetail, eq(spin(n, uTime * 0.012)));
+  float cellsM = molten.z;
+  float seam = pow(cellsM, 9.0) + 0.5 * molten.w;
+  vec4 air = texture2D(tAir, eq(cp));
+  float weather = clouds(air);
+  float streak = air.y;
+  float bands = smoothstep(-0.1, 0.4, streak);
+  float veil = uSteam * 0.62 * bands;
+  float cover = max(weather, veil);
+  // (Cloud shadows fall within a pixel or two of their clouds at this size: the cover itself.)
+  float shadow = cover;
   vec3 col = albedo * sunlight * diff * (1.0 - 0.55 * shadow);
   // Ocean glint (sun reflected in the sea), widened by waves near the terminator.
   vec3 H = normalize(L + V);
@@ -30925,16 +31219,26 @@ void main() {
   float glint = pow(max(dot(N, H), 0.0), 220.0) * 1.4 + pow(max(dot(N, H), 0.0), 30.0) * 0.08;
   col += sunlight * glint * water * soft * (0.3 + fres) * (1.0 - ice) * (1.0 - cover);
 
-  // Molten youth: a dark crust and fissures glowing in the film's colours of heat \u2014 a deep-blue
-  // glow, white-hot in the open cracks \u2014 that fade as it cools.
-  float hotness = 1.0 - uCool;
-  float crack = pow(1.0 - abs(snoise(n * 2.4)), 10.0) + 0.45 * pow(1.0 - abs(snoise(n * 4.8 + 3.0)), 10.0);
-  col *= mix(1.0, 0.3, hotness);
-  float heat = crack * 2.6 + 0.16 + 0.12 * (h + 0.5);
-  col += mix(P_ABYSS * 0.95, P_HI, smoothstep(0.5, 2.4, heat)) * heat * hotness * hotness;
+  // Molten youth, by temperature (blackbody): a magma ocean (~2 000 K, orange-yellow) churning in
+  // convection cells with hotter, brighter seams; then a dark basalt crust closes over it in
+  // plates (uCool) and only the fissures between them glow \u2014 dimming and reddening as they cool
+  // (~1 500 \u2192 950 K) \u2014 until the steam and the seas put them out.
+  float churn = texture2D(tAir, eq(spin(n, -uTime * 0.008))).z;
+  // Plates: the crust covers everything but the fissures as it thickens.
+  float plate = smoothstep(0.0, 0.35, uCool * 1.35 - seam * 0.9 + churn * 0.25);
+  float magmaT = 1650.0 + 420.0 * churn + 650.0 * seam;
+  vec3 magma = blackbody(magmaT) * (1.1 + 1.6 * seam + 0.5 * churn);
+  float fissT = mix(1500.0, 950.0, uCool) + 300.0 * seam;
+  vec3 fissure = blackbody(fissT) * seam * 2.2 * (1.0 - 0.8 * smoothstep(0.55, 1.0, uCool)) * (1.0 - smoothstep(0.0, 0.45, uOcean));
+  vec3 glow = mix(magma, fissure, plate);
+  // The crust itself is lit by the sun; the magma outshines it.
+  col *= plate;
+  col += glow * (1.0 - 0.75 * cover);
 
-  vec3 cloud = vec3(0.86, 0.91, 0.95) * sunlight * (diff * 0.85 + soft * 0.04);
-  col = mix(col, cloud, cover * 0.85);
+  vec3 cloud = vec3(0.86, 0.87, 0.88) * sunlight * (diff * 0.85 + soft * 0.04);
+  // Under the steam the fissures light its base: a dull red glow on the night side.
+  cloud += fissure * 0.25 * veil * (1.0 - diff);
+  col = mix(col, cloud, cover * 0.88);
 
   gl_FragColor = vec4(col, uOpacity);
 }
@@ -30976,21 +31280,176 @@ void main() {
   vec3 S = normalize(uSunV);
   float mu = dot(p, S);
   float lit = smoothstep(-0.28, 0.32, mu);
-  vec3 day = vec3(0.18, 0.55, 1.0);
-  // Toward the terminator the limb, where the light grazes through the air, pales to ice
-  // (no sunset tones: a cold, blue world).
+  // Rayleigh scattering of sunlight (\u221D \u03BB\u207B\u2074): a deep sky blue, paling where the limb is seen
+  // edge-on (the light has crossed more air and is scattered back toward white).
+  vec3 day = vec3(0.16, 0.42, 1.0);
   float limb = smoothstep(0.92, 1.0, b);
-  vec3 col = mix(day, mix(day, P_ICE, limb * 0.35), 1.0 - smoothstep(-0.05, 0.35, mu)) * lit;
-  // Twilight: a faint blue thread of scattered light around the night-side limb.
-  col += vec3(0.1, 0.38, 0.9) * smoothstep(-0.75, -0.1, mu) * (1.0 - lit) * limb * 0.22;
+  vec3 col = mix(day, vec3(0.5, 0.72, 1.0), limb * 0.35 * (1.0 - smoothstep(-0.05, 0.35, mu))) * lit;
+  // At the terminator the light grazes through the whole atmosphere and loses its blue: a thin
+  // band of sunset (a ~2 000 K-like orange) along the limb, fading into a faint blue twilight.
+  float dusk = exp(-pow((mu - 0.02) / 0.09, 2.0)) * limb;
+  col += vec3(1.0, 0.36, 0.1) * dusk * 0.22;
+  col += vec3(0.12, 0.2, 0.6) * smoothstep(-0.75, -0.1, mu) * (1.0 - lit) * limb * 0.2;
   float fwd = pow(max(dot(rd, S), 0.0), 5.0);
-  col += vec3(0.75, 0.95, 1.0) * fwd * lit * 0.6 * limb;
+  col += vec3(0.7, 0.85, 1.0) * fwd * lit * 0.6 * limb;
   float optical = path * dens;
   gl_FragColor = vec4(col * optical * uStrength, 1.0);
 }
 `
   );
-  function createSystem({ segments }) {
+  var SURF_W = 512;
+  var SURF_H = 256;
+  var DETAIL_W = 384;
+  var DETAIL_H = 192;
+  function quantiles(field, w, h, qs) {
+    const vals = [];
+    const wts = [];
+    for (let j = 0; j < h; j += 2) {
+      const wt = Math.cos(((j + 0.5) / h - 0.5) * Math.PI);
+      for (let i = j & 2 ? 1 : 0; i < w; i += 3) {
+        vals.push(field[j * w + i]);
+        wts.push(wt);
+      }
+    }
+    const order = vals.map((_, k) => k).sort((a, b) => vals[a] - vals[b]);
+    let total = 0;
+    for (const wt of wts) total += wt;
+    const out = [];
+    let acc = 0, q = 0;
+    for (const k of order) {
+      acc += wts[k];
+      while (q < qs.length && acc >= qs[q] * total) {
+        out.push(vals[k]);
+        q++;
+      }
+    }
+    while (out.length < qs.length) out.push(vals[order[order.length - 1]]);
+    return out;
+  }
+  function makeTexture(data, w, h) {
+    const tex = new DataTexture(data, w, h, RGBAFormat, HalfFloatType);
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = ClampToEdgeWrapping;
+    tex.magFilter = LinearFilter;
+    tex.minFilter = LinearFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    return tex;
+  }
+  function* bakePlanetSurface() {
+    const half = DataUtils.toHalfFloat;
+    const sn = createSimplex3(9127);
+    const fbm = (x, y, z, oct) => {
+      let v2 = 0, a = 0.5;
+      for (let o = 0; o < oct; o++) {
+        v2 += a * sn(x, y, z);
+        x = x * 2.05 + 1.3;
+        y = y * 2.05 + 1.3;
+        z = z * 2.05 + 1.3;
+        a *= 0.5;
+      }
+      return v2;
+    };
+    const ridgeOf = (v2) => {
+      const r = 1 - Math.abs(v2);
+      return r * r * r * r * r * r;
+    };
+    const cyclone = (px, py, pz, c, radius) => {
+      let ax = -c[2], az = c[0];
+      const al = Math.hypot(ax, az) || 1;
+      ax /= al;
+      az /= al;
+      const t2x = c[1] * az, t2y = c[2] * ax - c[0] * az, t2z = -c[1] * ax;
+      const dp = px * c[0] + py * c[1] + pz * c[2];
+      const dx = px - c[0] * dp, dy = py - c[1] * dp, dz = pz - c[2] * dp;
+      const u = dx * ax + dz * az, v2 = dx * t2x + dy * t2y + dz * t2z;
+      const r = Math.hypot(u, v2) / radius;
+      if (r > 1.6) return 0;
+      const th = Math.atan2(v2, u) * Math.sign(c[1]);
+      const arms = 0.5 + 0.5 * Math.cos(2 * (th + 2.6 * Math.log(r + 0.04)));
+      return Math.pow(arms, 1.6) * Math.exp(-r * r * 1.6) * smoothstep(0.03, 0.09, r) * 1.3;
+    };
+    const norm3 = (v2) => {
+      const l = Math.hypot(v2[0], v2[1], v2[2]);
+      return [v2[0] / l, v2[1] / l, v2[2] / l];
+    };
+    const CY1 = norm3([0.55, 0.62, 0.56]);
+    const CY2 = norm3([-0.62, -0.58, 0.52]);
+    const surf = new Uint16Array(SURF_W * SURF_H * 4);
+    const heights = new Float32Array(SURF_W * SURF_H);
+    for (let j = 0; j < SURF_H; j++) {
+      if (j % 3 === 0) yield;
+      const lat = ((j + 0.5) / SURF_H - 0.5) * Math.PI;
+      const y = Math.sin(lat), cl = Math.cos(lat);
+      for (let i = 0; i < SURF_W; i++) {
+        const lon = ((i + 0.5) / SURF_W - 0.5) * Math.PI * 2;
+        const x = cl * Math.cos(lon), z = cl * Math.sin(lon);
+        const wx = x + 0.12 * sn(x * 2 + 4, y * 2 + 4, z * 2 + 4);
+        const wy = y + 0.12 * sn(x * 2 + 9, y * 2 + 9, z * 2 + 9);
+        const wz = z + 0.12 * sn(x * 2 - 3, y * 2 - 3, z * 2 - 3);
+        const cont = sn(wx * 1.2, wy * 1.2, wz * 1.2) * 0.6 + sn(wx * 2.4 + 7, wy * 2.4 + 7, wz * 2.4 + 7) * 0.26;
+        const erosion = fbm(x * 7 + 2, y * 7 + 2, z * 7 + 2, 3) * 0.17;
+        const ridge = ridgeOf(sn(x * 5.2 + 2, y * 5.2 + 2, z * 5.2 + 2));
+        const margin = smoothstep(0.08, 0.2, cont) * (1 - smoothstep(0.3, 0.55, cont));
+        const k = (j * SURF_W + i) * 4;
+        heights[j * SURF_W + i] = cont + erosion + 0.22 * ridge * margin;
+        surf[k + 1] = half(ridge);
+        surf[k + 2] = half(sn(x * 18, y * 18, z * 18) * 0.5 + 0.5);
+        surf[k + 3] = half(sn(x * 2.6 + 7, y * 2.6 + 7, z * 2.6 + 7) * 0.5 + 0.5);
+      }
+    }
+    yield;
+    const hq = quantiles(heights, SURF_W, SURF_H, [0.06, 0.63, 0.985]);
+    for (let j = 0; j < SURF_H; j++) {
+      for (let i = 0; i < SURF_W; i++) {
+        const h = heights[j * SURF_W + i];
+        const hn = h >= hq[1] ? (h - hq[1]) / (hq[2] - hq[1]) * 0.42 : (h - hq[1]) / (hq[1] - hq[0]) * 0.3;
+        surf[(j * SURF_W + i) * 4] = half(hn);
+      }
+    }
+    const detail = new Uint16Array(DETAIL_W * DETAIL_H * 4);
+    const cloudC = new Float32Array(DETAIL_W * DETAIL_H);
+    const air = new Uint16Array(DETAIL_W * DETAIL_H * 4);
+    for (let j = 0; j < DETAIL_H; j++) {
+      if (j % 3 === 0) yield;
+      const lat = ((j + 0.5) / DETAIL_H - 0.5) * Math.PI;
+      const y = Math.sin(lat), cl = Math.cos(lat);
+      const alat = Math.abs(y);
+      const itcz = Math.exp(-((y / 0.06) ** 2)) * 0.34;
+      const belts = smoothstep(0.56, 0.66, alat) * (1 - smoothstep(0.78, 0.88, alat)) * 0.42;
+      const subtropic = smoothstep(0.22, 0.32, alat) * (1 - smoothstep(0.42, 0.52, alat));
+      const base = 0.14 + itcz + belts - 0.24 * subtropic;
+      for (let i = 0; i < DETAIL_W; i++) {
+        const lon = ((i + 0.5) / DETAIL_W - 0.5) * Math.PI * 2;
+        const x = cl * Math.cos(lon), z = cl * Math.sin(lon);
+        const k = (j * DETAIL_W + i) * 4;
+        detail[k] = half(0.035 * sn(x * 8, y * 8, z * 8) + 0.02 * sn(x * 23, y * 23, z * 23));
+        detail[k + 1] = half(sn(x * 7, y * 7, z * 7) * 0.5 + 0.5 + 0.25 * sn(x * 19, y * 19, z * 19));
+        detail[k + 2] = half(1 - Math.abs(sn(x * 3.1, y * 3.1, z * 3.1)));
+        const f = 1 - Math.abs(sn(x * 6.3 + 3, y * 6.3 + 3, z * 6.3 + 3));
+        detail[k + 3] = half(Math.pow(f, 12));
+        const cx = x + 0.08 * sn(x * 3 + 1, y * 3 + 1, z * 3 + 1);
+        const cy = y + 0.08 * sn(x * 3 + 6, y * 3 + 6, z * 3 + 6);
+        const cz = z + 0.08 * sn(x * 3 + 11, y * 3 + 11, z * 3 + 11);
+        const streak = fbm(cx * 2.2, cy * 7.5, cz * 2.2, 3);
+        const cells = fbm(cx * 11 + 3, cy * 11 + 3, cz * 11 + 3, 2);
+        let c = base * (0.55 + 0.9 * smoothstep(-0.3, 0.4, streak)) + streak * 0.5 + cells * 0.22;
+        c = Math.max(c, cyclone(x, y, z, CY1, 0.2) * 0.62, cyclone(x, y, z, CY2, 0.17) * 0.6);
+        cloudC[j * DETAIL_W + i] = c;
+        air[k + 1] = half(streak);
+        air[k + 2] = half(fbm(x * 5, y * 5, z * 5, 2));
+        air[k + 3] = half(1);
+      }
+    }
+    yield;
+    const cq = quantiles(cloudC, DETAIL_W, DETAIL_H, [0.5, 0.76, 0.97]);
+    for (let k = 0; k < cloudC.length; k++) {
+      const c = cloudC[k];
+      air[k * 4] = half(c < cq[1] ? 0.38 + (c - cq[0]) / (cq[1] - cq[0]) * 0.21 : 0.59 + (c - cq[1]) / (cq[2] - cq[1]) * 0.21);
+    }
+    return { surf: makeTexture(surf, SURF_W, SURF_H), detail: makeTexture(detail, DETAIL_W, DETAIL_H), air: makeTexture(air, DETAIL_W, DETAIL_H) };
+  }
+  function createSystem({ segments, surface }) {
     const group = new Group();
     const quad = new PlaneGeometry(2, 2);
     const sunUniforms = {
@@ -31017,8 +31476,11 @@ void main() {
     const sphere = new SphereGeometry(1, segments, Math.round(segments / 2));
     const planetUniforms = {
       uSunV: { value: new Vector3() },
-      uSunO: { value: new Vector3(0, 0, 1) },
+      tSurf: { value: surface.surf },
+      tDetail: { value: surface.detail },
+      tAir: { value: surface.air },
       uCool: { value: 0 },
+      uSteam: { value: 0 },
       uOcean: { value: 0 },
       uClouds: { value: 0 },
       uLife: { value: 0 },
@@ -31067,7 +31529,6 @@ void main() {
     const yAxis = new Vector3(0, 1, 0);
     const sunWorld = new Vector3(SUN[0], SUN[1], SUN[2]);
     const tmp = new Vector3();
-    const invQ = new Quaternion();
     function update(frame2, view, camera) {
       sun.visible = frame2.sun > 1e-3;
       sunUniforms.uIntensity.value = frame2.sun;
@@ -31079,16 +31540,15 @@ void main() {
       planet.visible = show;
       atmosphere.visible = show && frame2.atmo > 1e-3;
       if (!show) return;
-      spinQ.setFromAxisAngle(yAxis, 2.2 + frame2.t * 0.018);
+      spinQ.setFromAxisAngle(yAxis, 5.3 + frame2.t * 0.018);
       planet.quaternion.copy(tiltQ).multiply(spinQ);
       tmp.copy(sunWorld).sub(planet.position).normalize();
-      invQ.copy(planet.quaternion).invert();
-      planetUniforms.uSunO.value.copy(tmp).applyQuaternion(invQ);
       tmp.transformDirection(camera.matrixWorldInverse);
       planetUniforms.uSunV.value.copy(tmp);
       atmoUniforms.uSunV.value.copy(tmp);
       atmoUniforms.uCenterV.value.copy(planet.position).applyMatrix4(camera.matrixWorldInverse);
       planetUniforms.uCool.value = frame2.cool;
+      planetUniforms.uSteam.value = frame2.steam;
       planetUniforms.uOcean.value = frame2.ocean;
       planetUniforms.uClouds.value = frame2.clouds;
       planetUniforms.uLife.value = frame2.life;
@@ -31103,8 +31563,16 @@ void main() {
       sun.material.dispose();
       planet.material.dispose();
       atmosphere.material.dispose();
+      surface.surf.dispose();
+      surface.detail.dispose();
+      surface.air.dispose();
     }
-    return { group, update, dispose };
+    function forget(strip) {
+      strip(surface.surf);
+      strip(surface.detail);
+      strip(surface.air);
+    }
+    return { group, update, dispose, forget };
   }
 
   // src/universe/ending-post.js
@@ -31238,8 +31706,8 @@ vec3 shoulder(vec3 c) {
   return mix(m, vec3(top), smoothstep(1.0, 5.0, peak) * 0.55);
 }
 // Hue-preserving shoulder for the birth: the peak channel is compressed and the others follow in
-// proportion, so the cold fire keeps its ice and deep blue instead of greying out; only light far
-// past the shoulder burns through to white.
+// proportion, so the fire keeps its blackbody orange and red instead of washing out; only light
+// far past the shoulder burns through to white.
 vec3 incandescent(vec3 x) {
   float m = max(x.r, max(x.g, x.b));
   float mt = 1.0 - exp(-m);
@@ -31262,24 +31730,27 @@ void main() {
     p -= (p / max(r, 1e-5)) * defl;
   }
   // Impact shockwave: a refracting shell racing outward (derivative-of-Gaussian profile).
+  float shockSide = 0.0;
   if (uShockAmp > 0.0) {
     float x = (r - uShockR) / (0.045 + 0.05 * uShockR);
     float wave = x * exp(-x * x);
     shockEdge = exp(-x * x) * uShockAmp;
+    shockSide = smoothstep(-0.8, 0.8, x);
     p += (p / max(r, 1e-5)) * wave * uShockAmp * 0.035;
   }
   vec2 suv = uCenter + p / asp;
   vec2 fromC = suv - 0.5;
   float ca = (uAberration * 0.0035 + shockEdge * 0.006) * (0.3 + dot(fromC, fromC) * 3.0);
-  // Lens dispersion, cold: light displaced from nearer the centre adds an ice fringe, light from
-  // further out a deep-blue one (energy is only added, never split out of white into warm).
+  // The camera lens's chromatic aberration (gravitational lensing itself is achromatic): like a
+  // real lens it bends blue more than red \u2014 light displaced from nearer the centre adds a faint
+  // blue fringe, light from further out a faint red one (energy is only added, never split).
   vec3 col = texture2D(tScene, suv).rgb;
   if (ca > 0.0) {
     const vec3 Y = vec3(0.2126, 0.7152, 0.0722);
     float l0 = dot(col, Y);
     float lIn = dot(texture2D(tScene, suv - fromC * ca).rgb, Y);
     float lOut = dot(texture2D(tScene, suv + fromC * ca).rgb, Y);
-    col += P_ICE * max(lIn - l0, 0.0) * 0.45 + P_BLUE * max(lOut - l0, 0.0) * 0.4;
+    col += vec3(0.25, 0.45, 1.0) * max(lIn - l0, 0.0) * 0.4 + vec3(1.0, 0.3, 0.12) * max(lOut - l0, 0.0) * 0.25;
   }
   vec3 bloom = texture2D(tBloom, suv).rgb * uBloomNorm;
   // Energy-conserving bloom, plus (only at the handover) the engine's additive glow.
@@ -31288,31 +31759,32 @@ void main() {
   vec2 vq = (vUv - 0.5) * asp;
   float vig = 1.0 - uVignette * smoothstep(0.3, 1.25, length(vq));
   col *= vig;
-  // The shock front itself: a faint, irregular shell of ice-blue light, broken by a smooth noise
+  // The shock front itself: a faint, irregular shell of light, broken by a smooth noise
   // around the circle (48 cells, seamless; a hash of the direction grid drew rectangles where the
   // front is wide).
   if (shockEdge > 0.0) {
     float around = (atan(p.y, p.x) * 0.15915494 + 0.5) * 48.0;
     float cell = floor(around), fc = fract(around);
     float breakup = mix(hash11(mod(cell, 48.0)), hash11(mod(cell + 1.0, 48.0)), fc * fc * (3.0 - 2.0 * fc)) * 0.6 + 0.4;
-    col += vec3(0.5, 0.85, 1.0) * shockEdge * shockEdge * breakup * 0.05;
+    // Hot, blue-white on its inner edge; dispersed through a refracting front it reddens outward.
+    col += mix(vec3(0.55, 0.68, 1.0), vec3(1.0, 0.55, 0.3), shockSide) * shockEdge * shockEdge * breakup * 0.05;
   }
-  // Veiling glare from the blue-white star just outside the frame: a soft ice wash, no ghosts.
+  // Veiling glare from the sun-like star just outside the frame: a soft wash, no ghosts.
   if (uGlare.z > 0.0) {
     vec2 gd = (vUv - uGlare.xy) * asp;
-    col += vec3(0.62, 0.87, 1.0) * uGlare.z * (0.05 / (0.06 + dot(gd, gd)));
+    col += K_SUN * uGlare.z * (0.05 / (0.06 + dot(gd, gd)));
   }
   col *= uExposure;
-  // The impact's light: ice-white, concentrated at the singularity (the bloom spreads it); the
-  // blacks stay deep.
-  col += uFlash * vec3(0.85, 0.96, 1.0) * 1.3 * exp(-r * r * 60.0);
+  // The impact's light: hotter than anything after it \u2014 white with a breath of blue (~10 000 K) \u2014
+  // concentrated at the singularity (the bloom spreads it); the blacks stay deep.
+  col += uFlash * mix(vec3(1.0), vec3(0.61, 0.7, 1.0), 0.35) * 1.3 * exp(-r * r * 60.0);
   vec3 lin = col;
   col = mix(shoulder(lin * 1.12), aces(lin * 1.35), uCurveMix);
   if (uHue > 0.0) col = mix(col, incandescent(lin * 1.25), uHue);
-  // Grade: cool the shadows a touch (less through the birth, whose deep blues are already
-  // saturated), keep highlights clean.
+  // Grade: cool the deepest shadows a breath (none through the birth's fire), keep highlights
+  // clean.
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col *= mix(mix(vec3(0.92, 0.99, 1.05), vec3(1.0), smoothstep(0.0, 0.5, l)), vec3(1.0), 0.6 * uHue);
+  col *= mix(mix(vec3(0.97, 0.985, 1.03), vec3(1.0), smoothstep(0.0, 0.4, l)), vec3(1.0), uHue);
   col = toSRGB(col);
   // Graduated filter over the lower band, applied to the light only (the background stays exact).
   col *= 1.0 - uScrim * pow(1.0 - smoothstep(uScrimBand.x, uScrimBand.y, vUv.y), 1.6);
@@ -31591,7 +32063,7 @@ void main() {
     const ready = new Promise((resolve) => {
       readyResolve = resolve;
     });
-    const buildReport = { createMs: 0, steps: 0, longestMs: 0, buildMs: 0, beganBeforeBuild: false, compileMs: 0, beginMs: 0, beginCompileMs: 0, beginPending: 0, centreMs: 0, handoverMs: 0, heldMs: 0, focus: false, exact: false, light: "default" };
+    const buildReport = { createMs: 0, steps: 0, longestMs: 0, buildMs: 0, beganBeforeBuild: false, compileMs: 0, beginMs: 0, beginCompileMs: 0, beginPending: 0, centreMs: 0, handoverMs: 0, heldMs: 0, firstFrameMs: -1, focus: false, exact: false, light: "default" };
     const frame2 = createFrame();
     const cam = createCameraState();
     const look = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -31674,6 +32146,7 @@ void main() {
     let compiling = false;
     let allLinked = false;
     let holdSince = 0;
+    let runStart = 0;
     let pending = null;
     let buildError = null;
     canvas2?.addEventListener?.("webglcontextlost", onContextLost);
@@ -31698,7 +32171,9 @@ void main() {
       yield;
       soft = createSoft({ steps: tier2.plasmaSteps, octaves: tier2.plasmaOctaves, shells: tier2.shells, nodes: matter.nodes });
       yield;
-      system = createSystem({ segments: tier2.planetSegments });
+      const surface = yield* bakePlanetSurface();
+      yield;
+      system = createSystem({ segments: tier2.planetSegments, surface });
       yield;
       post = createPost(renderer2, { bloomLevels: tier2.bloomLevels, softScale: tier2.softScale, threadScale: tier2.threadScale, bloom: bloomEnabled });
       scene2.add(skies.band, skies.parent, skies.fresh, galaxy.group, matter.mesh, core.group, system.group);
@@ -31781,15 +32256,28 @@ void main() {
           finish();
           return;
         }
-        const unit2 = list[i++];
-        let job = null;
-        try {
-          job = compileUnit(unit2, probe, async);
-        } catch (error2) {
+        const t = displayTime();
+        let batch = started ? list.filter((u) => !u.done && !u.issued && u.at <= t && u.until >= t) : [];
+        if (batch.length > 1 && !holdSince) batch = batch.slice(0, 1);
+        if (!batch.length) {
+          const unit2 = list[i++];
+          if (unit2.issued) {
+            next();
+            return;
+          }
+          batch = [unit2];
         }
-        Promise.resolve(job).catch(() => {
-        }).then(() => idle(() => {
-          if (!stale()) firstUse(unit2);
+        const jobs = batch.map((unit2) => {
+          unit2.issued = true;
+          try {
+            return compileUnit(unit2, probe, async);
+          } catch (error2) {
+            return null;
+          }
+        });
+        Promise.all(jobs.map((job) => Promise.resolve(job).catch(() => {
+        }))).then(() => (holdSince ? setTimeout : idle)(() => {
+          if (!stale()) for (const unit2 of batch) firstUse(unit2);
           next();
         }));
       };
@@ -31801,15 +32289,18 @@ void main() {
       if (units) return units;
       const list = [];
       const seen = /* @__PURE__ */ new Set();
-      const add2 = (root, at) => root.traverse((o) => {
+      const add2 = (root, at, until = Infinity) => root.traverse((o) => {
         if (!o.material || seen.has(o)) return;
         seen.add(o);
-        list.push({ object: o, camera, scene: scene2, screen: false, at, done: false });
+        list.push({ object: o, camera, scene: scene2, screen: false, at, until, done: false });
       });
-      add2(matter.mesh, 0);
-      add2(core.group, 0);
-      add2(skies.parent, 0);
-      for (const unit2 of post.compileUnits([[soft.material, IMPACT], [soft.threads, 5.8]], IMPACT, 5.8)) list.push({ ...unit2, done: false });
+      add2(matter.mesh, 0, 24.5);
+      add2(core.group, 0, 7.6);
+      add2(skies.parent, 0, IMPACT);
+      const passUntil = /* @__PURE__ */ new Map([[soft.material, 21], [soft.threads, 9.7]]);
+      for (const unit2 of post.compileUnits([[soft.material, IMPACT], [soft.threads, 5.8]], IMPACT, 5.8)) {
+        list.push({ ...unit2, until: passUntil.get(unit2.object.material) ?? (unit2.at > IMPACT ? 9.7 : unit2.at > 0 ? 21 : Infinity), done: false });
+      }
       add2(galaxy.group, 18.9);
       add2(system.group, 21.6);
       add2(skies.fresh, 22.6);
@@ -31836,7 +32327,7 @@ void main() {
       let ok = true;
       for (let k = 0; k < units.length && units[k].at <= t; k++) {
         const unit2 = units[k];
-        if (unit2.done) continue;
+        if (unit2.done || unit2.until < t) continue;
         const material = unit2.object.material;
         const program = material ? renderer2.properties.get(material).currentProgram : null;
         if (!program || typeof program.isReady === "function" && !program.isReady()) {
@@ -31884,7 +32375,10 @@ void main() {
       compiling = false;
       allLinked = false;
       holdSince = 0;
-      if (units) for (const unit2 of units) unit2.done = false;
+      if (units) for (const unit2 of units) {
+        unit2.done = false;
+        unit2.issued = false;
+      }
       forgetGpu();
     }
     function onContextRestored() {
@@ -31901,6 +32395,7 @@ void main() {
         forgetDisposeHooks(soft.threads);
       }
       post?.forget(forgetDisposeHooks);
+      system?.forget(forgetDisposeHooks);
     }
     function prime() {
       if (!built) return;
@@ -32015,6 +32510,8 @@ void main() {
     }
     function startRun(handover) {
       const b0 = now();
+      runStart = b0;
+      buildReport.firstFrameMs = -1;
       const { positions: positions2 = null, colors: colors2 = null, sizes: sizes2 = null, energies: energies2 = null, camera: hc = null, origin: origin2 = [0.5, 0.62], focus: focus2 = null, focusLight } = handover;
       const count = positions2 ? Math.min(handover.count || positions2.length / 3, Math.floor(positions2.length / 3)) : 0;
       renderer2.getSize(sizeProbe);
@@ -32112,6 +32609,7 @@ void main() {
       const seedLight = focusLight === void 0 ? DEFAULT_SEED_LIGHT : lightOf(focusLight) || [];
       buildReport.light = focusLight === void 0 ? "default" : seedLight.length ? "handover" : "none";
       core.setLight(seedLight, 1 / d0);
+      setSeedLift(seedLight.length ? srgbOf(seedLight[0].halo) : null);
       buildReport.handoverMs = now() - h0;
       buildReport.beginMs = now() - b0;
     }
@@ -32132,6 +32630,7 @@ void main() {
       if (!saved) saveRenderer();
       const t = displayTime();
       if (!linkedBy(t)) return;
+      if (buildReport.firstFrameMs < 0) buildReport.firstFrameMs = now() - runStart;
       if (!post.allocated) allocateTargets();
       sampleFrame(frame2, t, reduced);
       for (const key in tuning) if (typeof frame2[key] === "number") frame2[key] *= tuning[key];
@@ -32228,12 +32727,18 @@ void main() {
       time = clamp2(Number(seconds) || 0, 0, DURATION);
       started = true;
       finished = time >= DURATION;
+      jumpTo();
     }
     function skipToEnd() {
       time = DURATION;
       started = true;
       finished = true;
       paused = false;
+      jumpTo();
+    }
+    function jumpTo() {
+      if (allLinked || !built || lost || disposed || !saved) return;
+      if (!compiling) compileWhenIdle(true);
     }
     function replay() {
       time = 0;
@@ -32316,6 +32821,16 @@ void main() {
     }
     return list.length ? list : null;
   }
+  function srgbOf(c) {
+    if (!c || c.length < 3) return null;
+    const out = [];
+    for (let k = 0; k < 3; k++) {
+      const v2 = Math.max(0, Math.min(1, Number(c[k])));
+      if (!Number.isFinite(v2)) return null;
+      out.push(v2 <= 31308e-7 ? v2 * 12.92 : 1.055 * Math.pow(v2, 1 / 2.4) - 0.055);
+    }
+    return Math.max(out[0], out[1], out[2]) > 0.02 ? out : null;
+  }
   function pointOf(p, C) {
     if (!p || typeof p.length !== "number" || p.length < 3) return null;
     const x = Number(p[0]), y = Number(p[1]), z = Number(p[2]);
@@ -32364,6 +32879,12 @@ void main() {
   var DEEPEST = lin(1784402);
   var WHITE = lin(15397624);
   var mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  var ICE_SEED = params.get("seedHue") === "ice";
+  var SEED_HI = ICE_SEED ? HI : mixc(blackbody(5900), [1, 1, 1], 0.45);
+  var SEED_TINT = ICE_SEED ? ICE : blackbody(5400);
+  var SEED_HALO2 = ICE_SEED ? mixc(ICE, DEEP, 0.5) : blackbody(4800);
+  var toSrgb = (c) => c <= 31308e-7 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055;
+  var SEED_SRGB = SEED_TINT.map(toSrgb);
   var unit = () => {
     const d = [gauss2(), gauss2(), gauss2()];
     const l = Math.hypot(...d) || 1;
@@ -32378,8 +32899,8 @@ void main() {
   var focus = null;
   var DIM = scene === "seed" ? 0.5 : 1;
   var LIGHT = [
-    { scale: 0.792, intensity: 0.85 * 1.4, core: HI, halo: ICE, breath: 0.26, rays: 0.3 },
-    { scale: 2.42, intensity: 0.14 * 1.6, core: [0, 0, 0], halo: mixc(ICE, DEEP, 0.5), breath: 0.1, rays: 0 }
+    { scale: 0.792, intensity: 0.85 * 1.4, core: SEED_HI, halo: SEED_TINT, breath: 0.26, rays: 0.3 },
+    { scale: 2.42, intensity: (ICE_SEED ? 0.14 : 0.1) * 1.6, core: [0, 0, 0], halo: SEED_HALO2, breath: 0.1, rays: 0 }
   ];
   var SEED = [0, 0, 0];
   if (scene === "seed") {
@@ -32406,12 +32927,13 @@ void main() {
       const v2 = unit();
       const r = Math.abs(gauss2()) * 0.09 * (0.6 + 0.4 * rand());
       const heat = Math.exp(-r * 18);
-      put(i, v2[0] * r, v2[1] * r, v2[2] * r, mixc(ICE, HI, 0.25 + 0.75 * heat), 8e-3 + 0.022 * heat, 0.01);
+      put(i, v2[0] * r, v2[1] * r, v2[2] * r, mixc(SEED_TINT, SEED_HI, 0.25 + 0.75 * heat), 8e-3 + 0.022 * heat, 0.01);
     }
     for (let k = quota(0.18); k > 0; k--, i++) {
       const v2 = unit();
       const r = 0.1 + Math.abs(gauss2()) * 0.22;
-      put(i, v2[0] * r, v2[1] * r, v2[2] * r, mixc(ICE, DEEP, rand() * 0.5), 0.012 + 0.016 * rand(), 0.011);
+      if (ICE_SEED) put(i, v2[0] * r, v2[1] * r, v2[2] * r, mixc(ICE, DEEP, rand() * 0.5), 0.012 + 0.016 * rand(), 0.011);
+      else put(i, v2[0] * r, v2[1] * r, v2[2] * r, SEED_TINT, (0.012 + 0.016 * rand()) * (1 - 0.35 * rand()), 0.011);
     }
     const view = [0, Math.sin(pitch), Math.cos(pitch)];
     const basisOf = (n2) => {
@@ -32430,7 +32952,7 @@ void main() {
       const n2 = [0, 1, 2].map((j) => view[j] * z + (vu[j] * Math.cos(a) + vw[j] * Math.sin(a)) * sz);
       orbits.push([n2, 0.3 + Math.pow(rand(), 1.4), rand() < 0.75 ? 1 : -1, rand() * 6.283, 0.5 + rand() * 1.4]);
     }
-    const tone = mixc(WHITE, ICE, 0.35);
+    const tone = ICE_SEED ? mixc(WHITE, ICE, 0.35) : mixc(WHITE, SEED_HI, 0.25);
     for (let k = quota(0.1); k > 0; k--, i++) {
       const [n2, r, dir, a0, len2] = orbits[k % 56];
       const [u, w] = basisOf(n2);
@@ -32545,7 +33067,7 @@ void main() {
     const bloom = new UnrealBloomPass(new Vector2(W * pixelRatio, H * pixelRatio), 0.55, 0.08, 0.48);
     bloom.highPassUniforms.smoothWidth.value = 0.32;
     const finish = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uBg: { value: new Vector3(4 / 255, 7 / 255, 11 / 255) }, uLift: { value: new Vector3(0.663 * 0.018 + 4e-3, 0.906 * 0.018 + 0.012, 0.949 * 0.018 + 0.022) }, uC: { value: new Vector2(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5) }, uAspect: { value: W / H }, uR: { value: tall ? 0.42 : 0.55 } },
+      uniforms: { tDiffuse: { value: null }, uBg: { value: new Vector3(4 / 255, 7 / 255, 11 / 255) }, uLift: { value: new Vector3(SEED_SRGB[0] * 0.018 + 4e-3, SEED_SRGB[1] * 0.018 + 0.012, SEED_SRGB[2] * 0.018 + 0.022) }, uC: { value: new Vector2(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5) }, uAspect: { value: W / H }, uR: { value: tall ? 0.42 : 0.55 } },
       vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uBg, uLift; uniform vec2 uC; uniform float uAspect, uR; varying vec2 vUv;
       vec3 filmic(vec3 c) { c *= 1.12; vec3 m = 1.0 - exp(-c); float peak = max(c.r, max(c.g, c.b)); float top = max(m.r, max(m.g, m.b)); return mix(m, vec3(top), smoothstep(1.0, 5.0, peak) * 0.55); }

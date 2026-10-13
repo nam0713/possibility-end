@@ -153,6 +153,8 @@ const scatterDefines = `
 #define SC_MARGIN ${f4(SCATTER.margin)}
 #define SC_STEEP ${f4(SCATTER.steep)}
 #define SC_DRIFT ${f4(SCATTER.drift)}
+#define SC_TONE0 ${f4(SCATTER.tones[0])}
+#define SC_TONE1 ${f4(SCATTER.tones[1])}
 #define SC_COLUMN ${f4(SCATTER.column)}
 `;
 
@@ -205,7 +207,7 @@ uniform vec4 uScatterRay;     // projection P[0], P[5], P[8], P[9] (off-axis com
 uniform vec4 uScatterCenter;  // formation centre xyz (eased with the composition), framing radius w
 uniform vec4 uScatterLook;    // x: reference camera distance, y: star gain, z/w: faint/bright sprite px
 uniform vec4 uScatterMotion;  // x: flow, y: outward push (× radius), z: twinkle, w: light kept in the text column
-uniform vec3 uScatterTone0;   // star colours (linear): cold white, ice, accent-hi, deep
+uniform vec3 uScatterTone0;   // star colours (linear, equal luminance): blackbody orange, yellow-white, white, blue-white
 uniform vec3 uScatterTone1;
 uniform vec3 uScatterTone2;
 uniform vec3 uScatterTone3;
@@ -328,9 +330,11 @@ void scatterStar(out vec3 wpos, out vec3 light, out float px, out float depth, o
   depth = uScatterLook.x * mix(SC_NEAR, SC_FAR, dz);
   vec3 view = vec3(depth * (u + uScatterRay.z) / uScatterRay.x, depth * (v + uScatterRay.w) / uScatterRay.y, -depth);
   wpos = (uScatterFrame * vec4(view, 1.0)).xyz;
-  // Mostly cold white, some ice cyan, a few accent-hi; faint, far stars lean deep blue.
-  vec3 c = tone < 0.55 ? uScatterTone0 : tone < 0.85 ? uScatterTone1 : uScatterTone2;
-  c = mix(c, uScatterTone3, 0.45 * dz * (1.0 - mag));
+  // A realistic spread of stellar temperatures along the blackbody locus: a few orange (K/M), many
+  // yellow-white and white (G/F/A), some blue-white (B) — piecewise between four blackbody tones.
+  vec3 c = tone < SC_TONE0 ? mix(uScatterTone0, uScatterTone1, tone / SC_TONE0)
+         : tone < SC_TONE1 ? mix(uScatterTone1, uScatterTone2, (tone - SC_TONE0) / (SC_TONE1 - SC_TONE0))
+         : mix(uScatterTone2, uScatterTone3, (tone - SC_TONE1) / (1.0 - SC_TONE1));
   float edge = 1.0 - smoothstep(1.0, SC_MARGIN, abs(u)); // the pan wraps off screen
   float calm = mix(uScatterMotion.w, 1.0, smoothstep(SC_COLUMN, SC_COLUMN + 0.25, abs(u)));
   float twk = 1.0 + uTwinkle * uScatterMotion.z * (0.5 + 0.5 * mag) * sin(uTime * qRate(0.7 + 2.0 * tw) + tw * 40.0);

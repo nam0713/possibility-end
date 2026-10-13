@@ -1,6 +1,7 @@
 // Shared GLSL chunks for the ending film.
 // Noise: 3D simplex noise after Ashima Arts / Stefan Gustavson (MIT), hashes after
 // Dave Hoskins' "hash without sine" (MIT). Everything else is written for this film.
+import { BB_MAX_K, BB_MIN_K, BB_STEPS, BB_TABLE, blackbodyExact as blackbody } from './ending-math.js';
 
 export const HASH = /* glsl */ `
 float hash11(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
@@ -59,62 +60,83 @@ float snoise(vec3 v) {
 }
 `;
 
+const v3 = c => `vec3(${c.map(x => x.toFixed(4)).join(', ')})`;
+const BB_GLSL = BB_TABLE.map(v3).join(',\n  ');
+
 /**
- * The film's one colour family (design/V9.1-FEEDBACK.md): ice cyan to deep blue, hue ~190–210°.
- * Everything the film draws — hot or cold, star or planet — varies luminance and saturation inside
- * it, never the hue. In this film temperature reads as brightness and pallor: white-hot cores,
- * ice cyan, then a saturated deep blue as light cools and fades into black.
+ * The film's light, physically motivated (design/V9.1-FEEDBACK.md, amendment 2).
  *
- * Linear RGB tints (largest channel 1, so they scale cleanly):
- *   P_WHITE  white-hot, a breath of ice        P_HI    accent-hi  #e6fbff
- *   P_ICE    accent     #a9e7f2 (the theme)     P_BLUE  accent-deep #4f8fb0
- *   P_DEEP   deepest    #1b3a52 (saturated)     P_ABYSS the deepest blue a fading skirt reaches
+ * Thermal light follows a blackbody: `blackbody(T)` is Planck's law integrated against the CIE
+ * colour-matching functions, in linear sRGB with its largest channel 1 (ending-math.js
+ * BB_TABLE, 32 log-spaced samples from 800 K to 40 000 K, interpolated in log T): dull red →
+ * orange → yellow → white (6500 K) → a faint blue-white for the hottest.
+ *
+ * Gas and dust take the colours astrophotographs show them in:
+ *   H_ALPHA    ionised hydrogen (HII regions, remnants): pink-red
+ *   O_III      doubly ionised oxygen (enriched, hot gas): teal
+ *   REFLECTION starlight scattered by dust: blue
+ *   DUST_LANE  transmission of a dust lane (absorbs blue first): brown-grey, a multiplier
+ *   WEB        the cosmic web in a survey render: a neutral, slightly blue grey-white
+ * plus a few named temperatures: K_SUN (5800 K, sun-like yellow-white), K_POP3 (40 000 K, the
+ * first, massive stars), K_BULGE (4200 K, old stars), K_YOUNG (11 000 K, young blue arms).
  */
 export const PALETTE = /* glsl */ `
-const vec3 P_WHITE = vec3(0.93, 0.985, 1.0);
-const vec3 P_HI = vec3(0.79, 0.965, 1.0);
-const vec3 P_ICE = vec3(0.45, 0.9, 1.0);
-const vec3 P_BLUE = vec3(0.18, 0.63, 1.0);
-const vec3 P_DEEP = vec3(0.12, 0.5, 1.0);
-const vec3 P_ABYSS = vec3(0.06, 0.35, 0.9);
+const vec3 BB[${BB_STEPS}] = vec3[${BB_STEPS}](
+  ${BB_GLSL}
+);
+vec3 blackbody(float T) {
+  float x = clamp(log(max(T, 1.0) / ${BB_MIN_K.toFixed(1)}) * ${((BB_STEPS - 1) / Math.log(BB_MAX_K / BB_MIN_K)).toFixed(6)}, 0.0, ${(BB_STEPS - 1).toFixed(1)});
+  float i = min(floor(x), ${(BB_STEPS - 2).toFixed(1)});
+  int k = int(i);
+  return mix(BB[k], BB[k + 1], x - i);
+}
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const vec3 H_ALPHA = vec3(1.0, 0.1, 0.14);
+const vec3 O_III = vec3(0.06, 0.78, 0.72);
+const vec3 REFLECTION = vec3(0.24, 0.44, 1.0);
+const vec3 DUST_LANE = vec3(0.42, 0.33, 0.25);
+const vec3 WEB = vec3(0.6, 0.7, 1.0);
+const vec3 K_SUN = ${v3(blackbody(5800))};
+const vec3 K_POP3 = ${v3(blackbody(40000))};
+const vec3 K_BULGE = ${v3(blackbody(4200))};
+const vec3 K_YOUNG = ${v3(blackbody(11000))};
+const vec3 K_WHITE = ${v3(blackbody(6500))};
 `;
 
-/** Thermal colour ramp: k = 0 (cold: dim deepest blue) … 1 (hot: ice-white). Linear RGB, unit-ish brightness. */
+/**
+ * The film's heat index k (0 … 1.15) as a temperature: k = 0 is 800 K (a dull red glow), 0.3 ≈
+ * 1 500 K (red-orange), 0.5 ≈ 2 400 K (orange), 0.8 ≈ 4 500 K (yellow-white), 1 = 7 000 K (white),
+ * 1.15 ≈ 9 700 K (white with a breath of blue): log T linear in k.
+ *
+ * thermal(k): that colour at unit-ish brightness (0.12 … 1, peak channel).
+ */
 export const THERMAL = /* glsl */ `
+float kelvin(float k) { return 800.0 * pow(8.75, k); }
 vec3 thermal(float k) {
-  k = clamp(k, 0.0, 1.0);
-  // Luminance rises 0.035 → 0.23 → 0.55 → 0.78 → 0.93 (as the old ramp did); the hue stays put.
-  vec3 c0 = vec3(0.0092, 0.0385, 0.077);
-  vec3 c1 = vec3(0.073, 0.255, 0.405);
-  vec3 c2 = vec3(0.26, 0.607, 0.867);
-  vec3 c3 = vec3(0.43, 0.86, 0.954);
-  vec3 c4 = vec3(0.80, 0.95, 1.00);
-  if (k < 0.25) return mix(c0, c1, k / 0.25);
-  if (k < 0.5) return mix(c1, c2, (k - 0.25) / 0.25);
-  if (k < 0.75) return mix(c2, c3, (k - 0.5) / 0.25);
-  return mix(c3, c4, (k - 0.75) / 0.25);
+  k = clamp(k, 0.0, 1.15);
+  return blackbody(kelvin(k)) * (0.12 + 0.88 * min(k, 1.0));
 }
 `;
 
 /**
- * Incandescence in the cold family: k = 0 (a dim, saturated deep blue) … 0.3 (deep blue) … 0.52
- * (electric cerulean) … 0.72 (bright cerulean-cyan) … 0.9 (ice) … 1.1 (white-hot). Unlike thermal()
- * the radiance rises steeply with temperature (roughly Stefan–Boltzmann), so a fireball reads as a
- * white-hot core burning out through ice cyan into deep blue, and a thread's faint skirt is blue
- * while its core is white. Saturated through the middle, pale only near the top; each stop keeps
- * about the luminance the v9 ramp had there, so exposures stay as tuned. Linear RGB; the peak
- * channel spans ~0.02 (k = 0) … ~3 (k = 1).
+ * Incandescence: the blackbody colour of heat index k at a radiance that rises steeply with
+ * temperature (roughly Stefan–Boltzmann over the film's exposure range): a fireball reads as a
+ * white-hot core burning out through yellow and orange into a dull red limb, a thread's faint
+ * skirt is red while its core is white. Peak channel ~0.03 (k = 0) … ~3 (k = 1).
+ *
+ * burnHot(k): a hotter population at the same radiance (its colour taken 0.25 further up the
+ * scale): blue-white cores, yellow-white bodies, orange skirts — the plasma's second family.
  */
 export const BURN = /* glsl */ `
+float kelvinB(float k) { return 800.0 * pow(8.75, k); }
+float burnRadiance(float k) { return (0.06 + 2.94 * k * k) * (0.55 + 0.45 * smoothstep(0.0, 0.45, k)); }
 vec3 burn(float k) {
   k = clamp(k, 0.0, 1.15);
-  vec3 c;
-  if (k < 0.3) c = mix(vec3(0.018, 0.105, 0.27), vec3(0.062, 0.26, 0.62), k / 0.3);
-  else if (k < 0.52) c = mix(vec3(0.062, 0.26, 0.62), vec3(0.1, 0.48, 1.03), (k - 0.3) / 0.22);
-  else if (k < 0.72) c = mix(vec3(0.1, 0.48, 1.03), vec3(0.24, 0.74, 1.2), (k - 0.52) / 0.2);
-  else if (k < 0.9) c = mix(vec3(0.24, 0.74, 1.2), vec3(0.5, 0.84, 1.0), (k - 0.72) / 0.18);
-  else c = mix(vec3(0.5, 0.84, 1.0), vec3(0.93, 0.98, 1.0), clamp((k - 0.9) / 0.2, 0.0, 1.0));
-  return c * (0.06 + 2.94 * k * k);
+  return blackbody(kelvinB(k)) * burnRadiance(k);
+}
+vec3 burnHot(float k) {
+  k = clamp(k, 0.0, 1.15);
+  return blackbody(kelvinB(k + 0.25)) * burnRadiance(k);
 }
 `;
 

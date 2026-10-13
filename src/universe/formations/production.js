@@ -1,10 +1,12 @@
 // Ch.3 손 PRODUCTION — a closed production loop: a trefoil knot carrying five conveyor lanes of
-// particles streaming along it (an assembly line), with "products" riding the lanes. Six white-hot
-// factories sit on the knot (the brightest lights; their dependency loops a deeper ice cyan); each spawns small dependency loops, some of which spawn their own.
+// ice particles streaming along it (an assembly line), with warm "products" (still glowing, 4800 K)
+// riding the lanes. Six factories sit on the knot — furnaces, the brightest lights: orange-hot
+// (3900 K) round a white-hot heart, throwing orange sparks — each spawning small deep-blue dependency
+// loops, some of which spawn their own.
 // While reading, the last stretch of the knot fills in: the loop closes.
 
 import { C, HEX } from '../config.js';
-import { TAU, eulerMatrix } from '../math.js';
+import { TAU, eulerMatrix, kelvin } from '../math.js';
 import { circlePoint, cluster, mix, transform } from './common.js';
 
 const S = 0.62;
@@ -71,7 +73,7 @@ export default {
       const oy = (fr[4] * Math.cos(ang) + fr[7] * Math.sin(ang)) * rr;
       const oz = (fr[5] * Math.cos(ang) + fr[8] * Math.sin(ang)) * rr;
       const product = b.rng() < 0.012;
-      const i = b.point(p[0] + ox, p[1] + oy, p[2] + oz, product ? C.white : mix(C.white, C.ice, 0.3 + 0.4 * (lane / lanes)), product ? 0.85 : 0.19 + 0.12 * b.rng(), product ? 0.042 : 0.012 + 0.008 * b.rng());
+      const i = b.point(p[0] + ox, p[1] + oy, p[2] + oz, product ? C.yellow : mix(C.white, C.ice, 0.3 + 0.4 * (lane / lanes)), product ? 0.8 : 0.19 + 0.12 * b.rng(), product ? 0.042 : 0.012 + 0.008 * b.rng());
       const len = 0.16;
       b.flow(i, fr[0] * len, fr[1] * len, fr[2] * len, 0.32 + 0.06 * (lane % 2));
       if (t > GAP_START) b.evolve(i, 0.42 + ((t - GAP_START) / (1 - GAP_START)) * 0.56);
@@ -91,7 +93,7 @@ export default {
       b.key(i, t);
     }
 
-    // Factories: white-hot clusters on the knot, each with dependency loops branching off.
+    // Factories: furnace-hot clusters on the knot, each with dependency loops branching off.
     const factoryBudget = b.quota(0.07);
     const loopBudget = b.quota(0.2);
     const loops = [];
@@ -99,7 +101,7 @@ export default {
       knotPoint(t, p);
       knotFrame(t, fr);
       const fp = [p[0], p[1], p[2]];
-      cluster(b, Math.round(factoryBudget / FACTORIES.length), fp[0], fp[1], fp[2], 0.06, C.iceHi, 0.32, 0.018, { falloff: 1.1, twinkle: 0.4 });
+      cluster(b, Math.round(factoryBudget / FACTORIES.length), fp[0], fp[1], fp[2], 0.06, mix(C.orange, C.sun, 0.45), 0.32, 0.018, { falloff: 1.1, twinkle: 0.4 });
       // Primary dependency loop: lies in the (tangent, normal) plane, offset outward.
       const side = f % 2 ? 1 : -1;
       const r1 = 0.3 + 0.06 * (f % 3);
@@ -117,17 +119,18 @@ export default {
       for (let k = 0; k < n; k++) {
         if (b.tick()) yield;
         circlePoint(p, L.c[0], L.c[1], L.c[2], L.n[0], L.n[1], L.n[2], L.r + b.gauss() * 0.012, b.rng() * TAU);
-        const i = b.point(p[0], p[1], p[2], mix(C.ice, C.deep, 0.3), 0.26 + 0.14 * b.rng(), 0.012 + 0.006 * b.rng());
+        const i = b.point(p[0], p[1], p[2], mix(C.deep, C.ice, 0.35), 0.22 + 0.12 * b.rng(), 0.012 + 0.006 * b.rng());
         b.orbit(i, L.n[0], L.n[1], L.n[2], L.w, L.c[0], L.c[1], L.c[2]);
       }
     }
 
-    // Sparks: white glints around the factories.
+    // Sparks: orange glints around the factories (2300–3600 K, cooling as they fly).
     const sparks = b.quota(0.04);
+    const spark = [0, 0, 0];
     for (let k = 0; k < sparks; k++) {
       if (b.tick()) yield;
       knotPoint(FACTORIES[k % FACTORIES.length], p);
-      const i = b.point(p[0] + b.gauss() * 0.22, p[1] + b.gauss() * 0.22, p[2] + b.gauss() * 0.22, C.iceHi, 0.13, 0.012);
+      const i = b.point(p[0] + b.gauss() * 0.22, p[1] + b.gauss() * 0.22, p[2] + b.gauss() * 0.22, kelvin(2300 + 1300 * b.rng(), 1, spark), 0.13, 0.012);
       b.twinkle(i, 1);
       b.glint(i, 0.25);
     }

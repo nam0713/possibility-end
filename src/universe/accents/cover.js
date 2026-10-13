@@ -113,7 +113,7 @@ export class CoverAccent {
     this.nodes.renderOrder = 30;
     this.group.add(this.nodes);
 
-    this.glow = createGlow({ core: C.iceHi, halo: C.ice, scale: 0.3, intensity: 0.6, flicker: 0.06, breath: 0.06 });
+    this.glow = createGlow({ core: C.core, halo: C.sun, scale: 0.3, intensity: 0.6, flicker: 0.06, breath: 0.06 });
     this.group.add(this.glow);
     this.time = -1;
   }

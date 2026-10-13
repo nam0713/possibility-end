@@ -3,14 +3,17 @@
 // visibly slow, constant pace. As you read, the galaxies drift apart (their pivots spread) and the
 // threads lengthen.
 //
-// One hue family only: the two minds differ in luminance, saturation and structure, never in hue.
-//   bright — a tight two-armed grand design with a large white-hot bulge: luminous and pale;
-//   deep   — three loose, beaded arms in saturated ice cyan fading to deep blue, a small core:
-//            dimmer overall, its star-forming knots the most saturated points of the scene;
-//   faint  — a small steel-blue cluster.
+// Two minds, two ages — coloured as astrophotography sees galaxies; the signals between them are ice
+// (the UI's colour: the mind itself).
+//   bright — older and yellower: a tight two-armed grand design round a large bulge of old stars
+//            (~4300 K), arms of a mature, yellow-white population, brown-grey dust in the disc;
+//   deep   — younger and bluer: three loose arms of hot young stars (blue-white) beaded with
+//            star-forming knots — pink HII regions (H-alpha) and blue-white young clusters — round a
+//            small yellowish core;
+//   faint  — a small old dwarf, dim yellow-white.
 
 import { C, HEX } from '../config.js';
-import { TAU, basisFromNormal } from '../math.js';
+import { TAU, basisFromNormal, kelvin } from '../math.js';
 import { keep, mix } from './common.js';
 
 const nrm = (x, y, z) => {
@@ -24,11 +27,15 @@ export const GALAXIES = [
   { c: [0.35, 1.45, -1.7], n: nrm(0.1, 0.6, 1), r: 0.42, w: 0.12, kind: 'faint', share: 0.05, arms: 2, pitch: 0.32, bulge: 0.14, spread: 0.18, beads: 0 },
 ];
 
-/** Per-kind colours (linear) and brightness: luminance and saturation tell the galaxies apart. */
+/**
+ * Per-kind colours (linear) and brightness. Stellar light is the blackbody of the population's
+ * typical temperature (old bulges ~4300 K, young arms 9000–13000 K); knots are pink HII (H-alpha) or
+ * blue-white young clusters; the diffuse disc is dust (brown-grey) lit by the stars around it.
+ */
 export const GALAXY_LOOK = {
-  bright: { core: C.iceHi, arm: keep(C.white, C.iceHi, 0.4), outer: keep(C.white, C.steel, 0.35), disc: keep(C.white, C.steel, 0.55), knot: C.iceHi, br: 1.15, glow: 0.62 },
-  deep: { core: C.ice, arm: keep(C.ice, C.deep, 0.22), outer: keep(C.deep, C.ice, 0.25), disc: keep(C.deep, C.mist, 0.35), knot: C.ice, br: 0.82, glow: 0.42 },
-  faint: { core: C.white, arm: C.steel, outer: C.steel, disc: C.mist, knot: C.white, br: 0.8, glow: 0.34 },
+  bright: { core: kelvin(4300, 0.85), arm: kelvin(5300, 0.8), outer: kelvin(6400, 0.7), disc: keep(C.dust, kelvin(4600), 0.25), knot: kelvin(9000, 0.8), halo: kelvin(4500, 0.8), br: 1.0, glow: 0.52 },
+  deep: { core: kelvin(5000, 0.8), arm: kelvin(15000, 0.95), outer: kelvin(22000, 0.95), disc: keep(C.dust, C.reflection, 0.45), knot: C.halpha, young: kelvin(25000), halo: keep(kelvin(5600, 0.6), C.reflection, 0.4), br: 1.15, glow: 0.42 },
+  faint: { core: kelvin(5200, 0.6), arm: kelvin(5800, 0.5), outer: kelvin(6200, 0.4), disc: keep(C.dust, C.mist, 0.5), knot: kelvin(6000, 0.5), halo: kelvin(5600, 0.5), br: 0.8, glow: 0.3 },
 };
 
 /** Signal threads (galaxy index pairs). */
@@ -60,7 +67,7 @@ export default {
         const roll = b.rng();
         let r, a, h, col, br, size;
         if (roll < G.bulge) {
-          // Bulge: large and white-hot in the bright galaxy, a small ice core in the deep one.
+          // Bulge: large and yellowish (old stars) in the bright galaxy, small in the young one.
           r = Math.abs(b.gauss()) * G.r * (bright ? 0.16 : 0.11);
           a = b.rng() * TAU;
           h = b.gauss() * G.r * (bright ? 0.09 : 0.06);
@@ -69,7 +76,8 @@ export default {
           size = 0.014;
         } else if (roll < G.bulge + 0.64) {
           // Logarithmic arms; scatter grows outward. The deep galaxy's arms are beaded with
-          // star-forming knots (density rejection along the arm), saturated at their peaks.
+          // star-forming knots (density rejection along the arm): pink HII regions and blue-white
+          // young clusters.
           let t = 0;
           let bead = 0;
           for (let tries = 0; tries < 5; tries++) {
@@ -82,16 +90,17 @@ export default {
           const armIdx = ((k % G.arms) / G.arms) * TAU;
           a = armIdx + Math.log(r / (G.r * 0.12)) / tanPitch + b.gauss() * G.spread * (0.6 + t);
           h = b.gauss() * 0.03;
-          col = mix(L.core, mix(L.arm, L.outer, t * t), Math.min(1, t * 1.3));
+          col = mix(L.core, mix(L.arm, L.outer, t * t), Math.min(1, t * (bright ? 1.3 : 2.4)));
           br = (0.12 + 0.2 * b.rng()) * (1.15 - t * 0.55) * L.br;
           size = 0.011 + 0.008 * b.rng();
           if (G.beads && bead > 0.6) {
-            col = mix(col, L.knot, 0.7);
-            br *= 1.6;
+            const hii = b.rng() < 0.45;
+            col = mix(col, hii ? L.knot : L.young, hii ? 0.8 : 0.7);
+            br *= hii ? 2.0 : 1.7;
           }
           if (b.rng() < 0.03) { br = 0.6 * L.br; size = 0.024; }
         } else {
-          // Diffuse disc.
+          // Diffuse disc: dust, lit by the stars around it.
           r = G.r * Math.pow(b.rng(), 0.6);
           a = b.rng() * TAU;
           h = b.gauss() * 0.05;
@@ -109,8 +118,7 @@ export default {
       }
     }
 
-    // Signal threads: points crawling from one galaxy to another at light speed (slowly), each in
-    // its sender's light (pale from the bright mind, ice cyan from the deep one).
+    // Signal threads: ice points crawling from one galaxy to another at light speed (slowly).
     const signals = b.quota(0.06);
     for (let k = 0; k < signals; k++) {
       if (b.tick()) yield;
@@ -118,19 +126,19 @@ export default {
       const A = GALAXIES[ia].c, B = GALAXIES[ib].c;
       const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
       const j = 0.012;
-      const i = b.point(A[0] + b.gauss() * j, A[1] + b.gauss() * j, A[2] + b.gauss() * j, GALAXY_LOOK[GALAXIES[ia].kind].knot, 0.12 + 0.16 * b.rng(), 0.011);
+      const i = b.point(A[0] + b.gauss() * j, A[1] + b.gauss() * j, A[2] + b.gauss() * j, keep(C.ice, C.iceHi, 0.3), 0.13 + 0.16 * b.rng(), 0.011);
       b.flow(i, dx, dy, dz, 0.045 + 0.01 * b.rng());
       // Anchored at the midpoint: as the galaxies drift apart the threads fall short of them.
       b.anchor(i, (A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2);
     }
 
-    // Intergalactic dust between them: pale on the bright side, deep blue on the other.
+    // Intergalactic medium between them: a faint neutral-blue haze.
     const dust = b.quota(0.08);
     for (let k = 0; k < dust; k++) {
       if (b.tick()) yield;
       const t = b.rng();
       const x = -2.6 + 5.2 * t + b.gauss() * 0.6;
-      const i = b.point(x, b.gauss() * 0.7, b.gauss() * 0.8, mix(C.steel, C.deep, t), 0.012 + 0.015 * b.rng(), 0.016);
+      const i = b.point(x, b.gauss() * 0.7, b.gauss() * 0.8, mix(C.mist, C.web, t), 0.012 + 0.015 * b.rng(), 0.016);
       b.anchor(i, x * 0.5, 0, 0);
       b.twinkle(i, 0.5);
     }

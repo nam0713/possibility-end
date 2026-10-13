@@ -1,10 +1,11 @@
-// Cover — "the possibility ring": a luminous, twisted (Möbius-like) ribbon of filaments around a
-// tiny white-hot singularity. The ribbon rotates rigidly so its twist slides around the loop, while
-// a third of the particles slide along the filaments: the ring visibly flows. Faint matter
+// Cover — "the possibility ring": a luminous, twisted (Möbius-like) ice ribbon of filaments around a
+// tiny white-hot singularity. Matter spirals in from a cold blue haze and heats as it falls (a
+// blackbody ramp: dull red → orange → white-hot at the core); a faint blue halo disc lies beyond. The ribbon
+// rotates rigidly so its twist slides around the loop, while a third of the particles slide along the filaments: the ring visibly flows. Faint matter
 // spirals inward to the singularity. The 8 chapter nodes ride an inclined orbit (accent).
 
 import { C, HEX } from '../config.js';
-import { TAU, eulerMatrix } from '../math.js';
+import { TAU, eulerMatrix, kelvin, smoothstep } from '../math.js';
 import { cluster, mix, transform } from './common.js';
 
 /** Ring frame: local ring plane is XZ (normal +Y); this matrix tilts it into world space. */
@@ -102,31 +103,34 @@ export default {
       b.orbit(i, axis[0], axis[1], axis[2], RING.spin * 0.8);
     }
 
-    // 3 — inner accretion: faint matter spiralling into the singularity, whitening as it nears it.
+    // 3 — inner accretion: faint matter spiralling into the singularity. Far out it is cold gas
+    // catching blue light; falling in, it heats along the blackbody: dull red, orange, white-hot.
     const accretion = b.quota(0.075);
+    const glow = [0, 0, 0];
     for (let k = 0; k < accretion; k++) {
       if (b.tick()) yield;
       const r = 0.1 + 1.45 * Math.pow(b.rng(), 0.8);
       const t = b.rng() * TAU;
       const heat = Math.pow(1 - r / 1.6, 2.2);
-      const col = mix(C.steel, C.iceHi, heat);
+      kelvin(1700 + 5200 * Math.pow(heat, 0.6), 1, glow);
+      const col = mix(C.deep, glow, smoothstep(0.015, 0.16, heat));
       const i = put(r * Math.cos(t), b.gauss() * 0.02 * r, r * Math.sin(t), col, 0.04 + 0.16 * heat, 0.011 + 0.01 * b.rng());
       b.orbit(i, axis[0], axis[1], axis[2], Math.min(1.6, 0.16 / Math.pow(r, 1.25)));
       transform(M, -Math.cos(t) * r * 0.35, 0, -Math.sin(t) * r * 0.35, v);
       b.flow(i, v[0], v[1], v[2], 0.05 + b.rng() * 0.05);
     }
 
-    // 4 — the singularity: a tiny white-hot core in an ice-cyan corona.
-    cluster(b, b.quota(0.012), 0, 0, 0, 0.035, C.ice, 0.55, 0.018, { spin: 0.6, falloff: 1.2 });
-    cluster(b, b.quota(0.004), 0, 0, 0, 0.012, C.iceHi, 0.9, 0.016, { spin: 0.9 });
+    // 4 — the singularity: a tiny white-hot core in a warm corona.
+    cluster(b, b.quota(0.012), 0, 0, 0, 0.035, C.sun, 0.5, 0.018, { spin: 0.6, falloff: 1.2 });
+    cluster(b, b.quota(0.004), 0, 0, 0, 0.012, C.core, 0.9, 0.016, { spin: 0.9 });
 
-    // 5 — outer halo: a thin, very faint disc beyond the ribbon.
+    // 5 — outer halo: a thin, very faint disc of cold dust beyond the ribbon, catching blue light.
     const halo = b.quota(0.09);
     for (let k = 0; k < halo; k++) {
       if (b.tick()) yield;
       const r = 2.45 + Math.pow(b.rng(), 1.4) * 2.4;
       const t = b.rng() * TAU;
-      const i = put(r * Math.cos(t), b.gauss() * 0.07, r * Math.sin(t), mix(C.deep, C.ice, b.rng() * 0.4), 0.006 + 0.016 * b.rng() * (3.2 / r), 0.012 + 0.008 * b.rng());
+      const i = put(r * Math.cos(t), b.gauss() * 0.07, r * Math.sin(t), mix(C.deep, C.reflection, b.rng() * 0.6), 0.007 + 0.018 * b.rng() * (3.2 / r), 0.012 + 0.008 * b.rng());
       b.orbit(i, axis[0], axis[1], axis[2], 0.028);
     }
   },

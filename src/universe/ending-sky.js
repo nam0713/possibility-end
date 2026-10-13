@@ -3,8 +3,8 @@
 // sky around the small planet (concentrated toward the galactic band), plus the band
 // itself: the home galaxy seen from inside its disk, drawn at full resolution.
 import * as THREE from 'three';
-import { FULLSCREEN_VERT, HASH, SIMPLEX } from './ending-glsl.js';
-import { gauss, rng } from './ending-math.js';
+import { FULLSCREEN_VERT, HASH, PALETTE, SIMPLEX } from './ending-glsl.js';
+import { blackbody, gauss, rng } from './ending-math.js';
 import { GALAXY_NORMAL, HERO, SUN } from './ending-layout.js';
 
 const VERT = /* glsl */ `
@@ -44,7 +44,8 @@ void main() {
   b *= (1.0 + 1.8 * pull) * (1.0 - smoothstep(0.86, 1.0, x));
   float size = mix(2.6, 1.0, m) * uPixelRatio;
   gl_PointSize = size;
-  vColor = mix(aStar.rgb, vec3(0.7, 0.88, 1.0), pull) * b * uIntensity;
+  // (Falling toward the singularity their light is blueshifted.)
+  vColor = mix(aStar.rgb, vec3(0.6, 0.72, 1.0), pull) * b * uIntensity;
 }
 `;
 
@@ -58,10 +59,16 @@ void main() {
 }
 `;
 
-// Star tints: cold white, ice, and a few deeper blue ones (one hue family, ending-glsl.js PALETTE).
-const TINT_A = [0.8, 0.92, 1.0];
-const TINT_B = [0.62, 0.84, 1.0];
-const TINT_C = [0.5, 0.78, 1.0];
+// Star tints by blackbody temperature, as a long exposure records a field: mostly white to
+// yellowish (F/G/K), some blue-white (A/B), a few orange (K/M), each a little desaturated toward
+// white (a bright star's core saturates the sensor).
+const STAR_TINT = [0, 0, 0];
+function starTint(k, j) {
+  const T = k < 0.58 ? 4600 + j * 2400 : k < 0.84 ? 7000 + j * j * 8000 : 3300 + j * 1200;
+  blackbody(T, STAR_TINT);
+  for (let c = 0; c < 3; c++) STAR_TINT[c] = STAR_TINT[c] * 0.6 + 0.4;
+  return STAR_TINT;
+}
 
 /**
  * One star field's data, built resumably (yields every `chunk` stars; see ending-film.js):
@@ -96,7 +103,7 @@ function* buildSky(count, seed, bandNormal, chunk = 3000) {
     }
     pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
     const k = rand();
-    const tint = k < 0.62 ? TINT_A : k < 0.86 ? TINT_B : TINT_C;
+    const tint = starTint(k, rand());
     star[i * 4] = tint[0]; star[i * 4 + 1] = tint[1]; star[i * 4 + 2] = tint[2];
     star[i * 4 + 3] = 1 - Math.pow(rand(), 5.0);
   }
@@ -125,6 +132,7 @@ uniform float uIntensity, uGrainScale;
 varying vec2 vUv;
 ${HASH}
 ${SIMPLEX}
+${PALETTE}
 float fbm3(vec3 p) { return snoise(p) * 0.55 + snoise(p * 2.1 + 3.7) * 0.3 + snoise(p * 4.3 - 1.9) * 0.15; }
 // Fine stars fixed to the sky: one candidate per cell of a direction-space grid.
 float grain(vec3 rd, float density) {
@@ -149,14 +157,20 @@ void main() {
   float clouds = smoothstep(-0.25, 0.75, fbm3(rd * 7.0 + 3.0));
   float rift = smoothstep(0.0, 0.5, fbm3(rd * 5.5 + 13.0) * 0.5 + 0.5 + 0.15 * snoise(rd * 21.0));
   float lane = rift * exp(-pow((e + 0.008) / (w * 0.42), 2.0));
-  float dust = 1.0 - 0.88 * lane;
-  vec3 cool = vec3(0.6, 0.8, 1.0);
-  vec3 pale = vec3(0.8, 0.94, 1.0) * 0.92;
-  vec3 tint = mix(cool, pale, smoothstep(0.3, 1.0, toward) * 0.7);
-  float diffuse = (strip * (0.18 + 0.82 * clouds) + wide * 0.1 + core * 0.9) * dust;
-  float density = clamp((strip * (0.2 + 0.8 * clouds * clouds) + wide * 0.05) * dust, 0.0, 1.0) * 0.4 + 0.0015;
+  // Dust rifts absorb blue first: the light through their edges is reddened, brown-grey.
+  vec3 dust = mix(vec3(1.0), DUST_LANE * 0.3, lane * 0.95);
+  // The band as a long exposure shows it: a neutral, faintly warm white out along the disk (the
+  // integrated light of ordinary stars), yellower toward the galaxy's centre (its old bulge).
+  vec3 cool = vec3(0.86, 0.88, 0.95);
+  vec3 pale = mix(K_BULGE, vec3(1.0), 0.45) * 0.95;
+  vec3 tint = mix(cool, pale, smoothstep(0.3, 1.0, toward) * 0.8);
+  // A few faint pink HII knots along the star clouds.
+  float knots = smoothstep(0.78, 0.95, snoise(rd * 38.0 + 5.0) * 0.5 + 0.5) * strip * clouds;
+  float diffuse = strip * (0.18 + 0.82 * clouds) + wide * 0.1 + core * 0.9;
+  float dustL = dot(dust, vec3(0.3333));
+  float density = clamp((strip * (0.2 + 0.8 * clouds * clouds) + wide * 0.05) * dustL, 0.0, 1.0) * 0.4 + 0.0015;
   float stars = grain(rd, density) + grain(rd * 1.7 + 0.31, density * 0.6) * 0.5;
-  vec3 col = tint * (diffuse * 0.055 + stars * 0.42);
+  vec3 col = tint * dust * diffuse * 0.055 + tint * stars * 0.42 + mix(H_ALPHA, vec3(1.0, 0.45, 0.6), 0.4) * knots * 0.012;
   gl_FragColor = vec4(col * uIntensity, 1.0);
 }
 `;

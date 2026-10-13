@@ -2,6 +2,8 @@
 // nodes, loops threaded on those nodes, and smaller loops on those. Every loop flows about its
 // own axis, faster at each level of recursion (better AI speeds the next AI). Pulses stream along
 // the connections from the core outward and back (accent lines repeat them with accelerating pulses).
+// Colour: ice loops (structure); what emits is thermal — the white-hot core, warm-white great nodes and
+// the pulses (thought travelling) a warm 4800 K glow.
 
 import { C, HEX } from '../config.js';
 import { TAU, basisFromNormal } from '../math.js';
@@ -101,24 +103,27 @@ export default {
       }
     }
 
-    // Nodes: bright clusters; the core is white with a white-hot heart.
-    cluster(b, b.quota(0.025), 0, 0, 0, 0.06, C.white, 0.34, 0.016, { falloff: 1.6, spin: 0.5 });
-    cluster(b, b.quota(0.006), 0, 0, 0, 0.03, C.iceHi, 0.9, 0.02, { spin: 0.8 });
+    // Nodes: bright clusters; the core is white-hot (a sun-warm corona round a white heart), the great
+    // loop's nodes a barely warm white, the threaded loops' nodes cold white.
+    cluster(b, b.quota(0.025), 0, 0, 0, 0.06, C.sun, 0.34, 0.016, { falloff: 1.6, spin: 0.5 });
+    cluster(b, b.quota(0.006), 0, 0, 0, 0.03, C.core, 0.9, 0.02, { spin: 0.8 });
+    const warmNode = keep(C.white, C.hot, 0.6);
     const perNode = b.quota(0.075) / (nodes.length - 1);
     for (let k = 1; k < nodes.length; k++) {
       yield; // one node per step: time-sliced builds never overrun their slot
       const nd = nodes[k];
-      cluster(b, Math.round(perNode * (nd.level === 1 ? 1.7 : 0.75)), nd.p[0], nd.p[1], nd.p[2], nd.level === 1 ? 0.036 : 0.022, C.white, 0.3, 0.014, { falloff: 1.4, twinkle: 0.3 });
+      cluster(b, Math.round(perNode * (nd.level === 1 ? 1.7 : 0.75)), nd.p[0], nd.p[1], nd.p[2], nd.level === 1 ? 0.036 : 0.022, nd.level === 1 ? warmNode : C.white, 0.3, 0.014, { falloff: 1.4, twinkle: 0.3 });
     }
 
-    // Connections: pulses streaming outward from the core and between nodes; deeper links run faster.
+    // Connections: warm (4800 K) pulses streaming outward from the core and between nodes; deeper links
+    // run faster.
     const perLink = b.quota(0.17) / links.length;
     for (const [ia, ib] of links) {
       yield;
       const A = nodes[ia].p, B = nodes[ib].p;
       const deep = nodes[ib].level;
       const rate = deep === 2 ? 0.55 : 0.3;
-      connection(b, Math.round(perLink * (deep === 2 ? 0.7 : 1.3)), A[0], A[1], A[2], B[0], B[1], B[2], mix(C.white, C.ice, 0.4), 0.32, 0.016, rate, 0.012);
+      connection(b, Math.round(perLink * (deep === 2 ? 0.7 : 1.3)), A[0], A[1], A[2], B[0], B[1], B[2], mix(C.yellow, C.sun, 0.35), 0.3, 0.016, rate, 0.012);
     }
 
     // Glia: a faint cloud of sparks around the structure.

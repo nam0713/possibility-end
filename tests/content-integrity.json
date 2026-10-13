@@ -42,8 +42,8 @@
     "is_v8_1_manuscript": true
   },
   "html_sha256": {
-    "index.html": "24d76ef734d0989fe4a5976f6e48fe65b91dc001dfe4a936994ec84de09de3fa",
-    "dist/index.html": "24d76ef734d0989fe4a5976f6e48fe65b91dc001dfe4a936994ec84de09de3fa"
+    "index.html": "4626e276c03f9bd5e6ecedaf4e1031db1ee67ffd07db0046dfc1a0cfb7f9d705",
+    "dist/index.html": "4626e276c03f9bd5e6ecedaf4e1031db1ee67ffd07db0046dfc1a0cfb7f9d705"
   },
   "audio_sha256": {
     "horizon.mp3": "6646b7b0af8dbbd42461f67b100c3ee66cde10e7c86264a1c4a4083b4424ce1e",

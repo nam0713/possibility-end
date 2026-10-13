@@ -9,8 +9,12 @@
 
 import * as THREE from 'three';
 import { HOLE_UNIFORMS, FLOW_T, PACK, SCATTER_SEED, STATE_WIDTH, TIME_PERIOD, bakeFragment, particleFragment, particleVertex, qCycles, qRate, wrapTime } from './shaders.js';
-import { clamp, fract, mulberry32, rotateAxis } from '../math.js';
-import { C, SCATTER } from '../config.js';
+import { clamp, fract, kelvinY, mulberry32, rotateAxis } from '../math.js';
+import { SCATTER } from '../config.js';
+
+/** The reading starfield's four blackbody tones (linear, equal luminance, a little desaturated so
+ * the field stays calm behind text): SCATTER.temps. */
+const SCATTER_TONES = SCATTER.temps.map((T) => kelvinY(T, SCATTER.saturation));
 
 const I16 = 1 / 32767;
 const U8 = 1 / 255;
@@ -130,10 +134,10 @@ export class ParticleField {
       uScatterCenter: { value: new THREE.Vector4(0, 0, 0, 3) },
       uScatterLook: { value: new THREE.Vector4(10, SCATTER.gain, SCATTER.px, SCATTER.pxBright) },
       uScatterMotion: { value: new THREE.Vector4(SCATTER.flow, SCATTER.outward, SCATTER.twinkle, 1) },
-      uScatterTone0: { value: new THREE.Vector3(...C.white) },
-      uScatterTone1: { value: new THREE.Vector3(...C.ice) },
-      uScatterTone2: { value: new THREE.Vector3(...C.iceHi) },
-      uScatterTone3: { value: new THREE.Vector3(...C.deep) },
+      uScatterTone0: { value: new THREE.Vector3(...SCATTER_TONES[0]) },
+      uScatterTone1: { value: new THREE.Vector3(...SCATTER_TONES[1]) },
+      uScatterTone2: { value: new THREE.Vector3(...SCATTER_TONES[2]) },
+      uScatterTone3: { value: new THREE.Vector3(...SCATTER_TONES[3]) },
     };
     const blend = {
       transparent: true,
@@ -678,15 +682,16 @@ export class ParticleField {
     out.x = m[0] * vx + m[4] * vy + m[8] * vz + m[12];
     out.y = m[1] * vx + m[5] * vy + m[9] * vz + m[13];
     out.z = m[2] * vx + m[6] * vy + m[10] * vz + m[14];
-    const T = tone < 0.55 ? u.uScatterTone0.value : tone < 0.85 ? u.uScatterTone1.value : u.uScatterTone2.value;
-    const D = u.uScatterTone3.value;
-    const w = 0.45 * dz * (1 - mag);
+    const [t0, t1] = SCATTER.tones;
+    const A = tone < t0 ? u.uScatterTone0.value : tone < t1 ? u.uScatterTone1.value : u.uScatterTone2.value;
+    const D = tone < t0 ? u.uScatterTone1.value : tone < t1 ? u.uScatterTone2.value : u.uScatterTone3.value;
+    const w = tone < t0 ? tone / t0 : tone < t1 ? (tone - t0) / (t1 - t0) : (tone - t1) / (1 - t1);
     const edge = 1 - smooth(1, SCATTER.margin, Math.abs(su));
     const calm = u.uScatterMotion.value.w + (1 - u.uScatterMotion.value.w) * smooth(SCATTER.column, SCATTER.column + 0.25, Math.abs(su));
     const e = L.y * (0.08 + 0.92 * mag) * (0.6 + 0.4 * near) * edge * calm;
-    out.r = (T.x + (D.x - T.x) * w) * e;
-    out.g = (T.y + (D.y - T.y) * w) * e;
-    out.b = (T.z + (D.z - T.z) * w) * e;
+    out.r = (A.x + (D.x - A.x) * w) * e;
+    out.g = (A.y + (D.y - A.y) * w) * e;
+    out.b = (A.z + (D.z - A.z) * w) * e;
     out.px = L.z + (L.w - L.z) * mag;
     out.depth = depth;
     return out;

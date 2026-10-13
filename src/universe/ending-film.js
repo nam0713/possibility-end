@@ -6,9 +6,9 @@
 // its state, inflation drags us through the plasma's incandescent threads, fields and
 // particles separate, it turns transparent; in the dark ages gas condenses into the
 // first knots, the first stars ignite, the cosmic web and proto-galaxies form — then
-// one ordinary spiral galaxy, a dive to its outskirts, a blue-white star and a small rocky
-// planet that cools into a blue world. One cold hue family throughout (ice cyan to deep
-// blue, ending-glsl.js PALETTE): luminance and saturation vary, never the hue.
+// one ordinary spiral galaxy, a dive to its outskirts, a sun-like star and a small rocky
+// planet that cools into a blue world. Physically motivated colour (ending-glsl.js): thermal light
+// by blackbody temperature, gas and dust in astrophotography colours, a planet lit by its star.
 //
 // The entry is one light: the seed the reader pressed. The engine hands over its world
 // position (`focus`); the film collapses exactly onto it, and its first frames continue the
@@ -18,14 +18,14 @@
 // ending-camera.js), so seek / skip / replay / reduced-motion stills are exact.
 // Contract: see design/V9-BRIEF.md and design/V9-ENDING.md.
 import * as THREE from 'three';
-import { DURATION, IMPACT, PHASES, PHASE_STILLS, createFrame, phaseIndex, sampleFrame, scaleFactor } from './ending-timeline.js';
+import { DURATION, IMPACT, PHASES, PHASE_STILLS, createFrame, phaseIndex, sampleFrame, scaleFactor, setSeedLift } from './ending-timeline.js';
 import { cameraAt, createCameraState } from './ending-camera.js';
 import { buildMatterData, createMatter } from './ending-matter.js';
 import { DEFAULT_SEED_LIGHT, createCore } from './ending-core.js';
 import { buildSkyData, createSkies } from './ending-sky.js';
 import { createSoft } from './ending-soft.js';
 import { createGalaxy, fillGalaxyStars } from './ending-galaxy.js';
-import { createSystem } from './ending-planet.js';
+import { bakePlanetSurface, createSystem } from './ending-planet.js';
 import { createPost } from './ending-post.js';
 import { GALAXY_NORMAL, HERO, SUN } from './ending-layout.js';
 import { clamp, mix, rng, smoothstep } from './ending-math.js';
@@ -74,7 +74,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
    * begin() came before the build finished; the compile chain's wall time; begin()'s own cost
    * (centroid, handover copy) and the programs it left to the chain; the longest hold for a link.
    */
-  const buildReport = { createMs: 0, steps: 0, longestMs: 0, buildMs: 0, beganBeforeBuild: false, compileMs: 0, beginMs: 0, beginCompileMs: 0, beginPending: 0, centreMs: 0, handoverMs: 0, heldMs: 0, focus: false, exact: false, light: 'default' };
+  const buildReport = { createMs: 0, steps: 0, longestMs: 0, buildMs: 0, beganBeforeBuild: false, compileMs: 0, beginMs: 0, beginCompileMs: 0, beginPending: 0, centreMs: 0, handoverMs: 0, heldMs: 0, firstFrameMs: -1, focus: false, exact: false, light: 'default' };
 
   // ---- state
   const frame = createFrame();
@@ -117,6 +117,8 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
   let compiling = false;
   let allLinked = false;
   let holdSince = 0;
+  /** When the current run began (startRun), for buildReport.firstFrameMs. */
+  let runStart = 0;
   /** A handover waiting for the build (begin() before the idle build finished). */
   let pending = null;
   let buildError = null;
@@ -147,7 +149,9 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     yield;
     soft = createSoft({ steps: tier.plasmaSteps, octaves: tier.plasmaOctaves, shells: tier.shells, nodes: matter.nodes });
     yield;
-    system = createSystem({ segments: tier.planetSegments });
+    const surface = yield* bakePlanetSurface();
+    yield;
+    system = createSystem({ segments: tier.planetSegments, surface });
     yield;
     post = createPost(renderer, { bloomLevels: tier.bloomLevels, softScale: tier.softScale, threadScale: tier.threadScale, bloom: bloomEnabled });
     scene.add(skies.band, skies.parent, skies.fresh, galaxy.group, matter.mesh, core.group, system.group);
@@ -242,11 +246,23 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     const next = () => {
       while (i < list.length && list[i].done) i++;
       if (stale() || i >= list.length) { finish(); return; }
-      const unit = list[i++];
-      let job = null;
-      try { job = compileUnit(unit, probe, async); } catch (error) { /* reported again on first render */ }
-      Promise.resolve(job).catch(() => {}).then(() => idle(() => {
-        if (!stale()) firstUse(unit);
+      // What the film draws now comes first (after a jump), then everything in order. While the
+      // film holds its frame for them (holdSince) they are issued together — their translations run
+      // in parallel in the GPU process — and the chain runs at once, not in idle time.
+      const t = displayTime();
+      let batch = started ? list.filter(u => !u.done && !u.issued && u.at <= t && u.until >= t) : [];
+      if (batch.length > 1 && !holdSince) batch = batch.slice(0, 1);
+      if (!batch.length) {
+        const unit = list[i++];
+        if (unit.issued) { next(); return; }
+        batch = [unit];
+      }
+      const jobs = batch.map(unit => {
+        unit.issued = true;
+        try { return compileUnit(unit, probe, async); } catch (error) { return null; /* reported again on first render */ }
+      });
+      Promise.all(jobs.map(job => Promise.resolve(job).catch(() => {}))).then(() => (holdSince ? setTimeout : idle)(() => {
+        if (!stale()) for (const unit of batch) firstUse(unit);
         next();
       }));
     };
@@ -264,16 +280,21 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     if (units) return units;
     const list = [];
     const seen = new Set();
-    const add = (root, at) => root.traverse(o => {
+    // `until`: the last film second the unit draws (conservative), so a seek only waits for what
+    // that time draws (see linkedBy / seek).
+    const add = (root, at, until = Infinity) => root.traverse(o => {
       if (!o.material || seen.has(o)) return;
       seen.add(o);
-      list.push({ object: o, camera, scene, screen: false, at, done: false });
+      list.push({ object: o, camera, scene, screen: false, at, until, done: false });
     });
-    add(matter.mesh, 0);
-    add(core.group, 0);
-    add(skies.parent, 0);
+    add(matter.mesh, 0, 24.5);
+    add(core.group, 0, 7.6);
+    add(skies.parent, 0, IMPACT);
     // (The fireball and gas share the soft pass; the threads and their zoom blur follow at 5.8 s.)
-    for (const unit of post.compileUnits([[soft.material, IMPACT], [soft.threads, 5.8]], IMPACT, 5.8)) list.push({ ...unit, done: false });
+    const passUntil = new Map([[soft.material, 21.0], [soft.threads, 9.7]]);
+    for (const unit of post.compileUnits([[soft.material, IMPACT], [soft.threads, 5.8]], IMPACT, 5.8)) {
+      list.push({ ...unit, until: passUntil.get(unit.object.material) ?? (unit.at > IMPACT ? 9.7 : unit.at > 0 ? 21.0 : Infinity), done: false });
+    }
     add(galaxy.group, 18.9);
     add(system.group, 21.6);
     add(skies.fresh, 22.6);
@@ -307,7 +328,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     let ok = true;
     for (let k = 0; k < units.length && units[k].at <= t; k++) {
       const unit = units[k];
-      if (unit.done) continue;
+      if (unit.done || unit.until < t) continue;
       const material = unit.object.material;
       const program = material ? renderer.properties.get(material).currentProgram : null;
       if (!program || (typeof program.isReady === 'function' && !program.isReady())) { ok = false; break; }
@@ -351,7 +372,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     compiling = false;
     allLinked = false;
     holdSince = 0;
-    if (units) for (const unit of units) unit.done = false;
+    if (units) for (const unit of units) { unit.done = false; unit.issued = false; }
     // Every GL object the film made died with the context. three re-creates them from our data on
     // first use after a restore; the dispose hooks it registered belong to the old context, so they
     // must never run (deleting foreign objects floods the console with warnings).
@@ -370,6 +391,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     });
     if (soft) { forgetDisposeHooks(soft.material); forgetDisposeHooks(soft.threads); }
     post?.forget(forgetDisposeHooks);
+    system?.forget(forgetDisposeHooks);
   }
 
   // ---------------------------------------------------------------- helpers
@@ -506,6 +528,8 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
   /** Place the handover and start the run (the build is complete). */
   function startRun(handover) {
     const b0 = now();
+    runStart = b0;
+    buildReport.firstFrameMs = -1;
     const { positions = null, colors = null, sizes = null, energies = null, camera: hc = null, origin = [0.5, 0.62], focus = null, focusLight } = handover;
     const count = positions ? Math.min(handover.count || positions.length / 3, Math.floor(positions.length / 3)) : 0;
     // Size: from the handover, else from the shared renderer itself.
@@ -588,6 +612,9 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     const seedLight = focusLight === undefined ? DEFAULT_SEED_LIGHT : lightOf(focusLight) || [];
     buildReport.light = focusLight === undefined ? 'default' : seedLight.length ? 'handover' : 'none';
     core.setLight(seedLight, 1 / d0);
+    // The engine's background lift around the seed is tinted by the seed's colour (its formation
+    // tint, the glow's halo colour): continue it in that colour.
+    setSeedLift(seedLight.length ? srgbOf(seedLight[0].halo) : null);
     buildReport.handoverMs = now() - h0;
 
     buildReport.beginMs = now() - b0;
@@ -616,6 +643,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     const t = displayTime();
     // Hold the last frame (at the start: the engine's) while a program it draws is still linking.
     if (!linkedBy(t)) return;
+    if (buildReport.firstFrameMs < 0) buildReport.firstFrameMs = now() - runStart;
     if (!post.allocated) allocateTargets();
     sampleFrame(frame, t, reduced);
     // Lab-only: multiply chosen frame values (e.g. { plasmaEmit: 0.5 }) for art tuning.
@@ -669,7 +697,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     // Einstein radius (screen heights). The lens is screen-space (it cannot tell the disk from
     // the sky behind it), so it stays modest and fades out over the inner disk (ending-post.js).
     postParams.lensR = 0.022 * frame.lens;
-    // The engine's background lift around the seed (its ice tint), fading as space darkens.
+    // The engine's background lift around the seed (in the seed's tint), fading as space darkens.
     postParams.liftRadius = aspect < 0.8 ? 0.42 : 0.55;
     // The star's veiling glare once it has slid out of the frame (it must be in front of us).
     postParams.glare = 0;
@@ -739,6 +767,7 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     time = clamp(Number(seconds) || 0, 0, DURATION);
     started = true;
     finished = time >= DURATION;
+    jumpTo();
   }
 
   function skipToEnd() {
@@ -746,7 +775,19 @@ export function createEndingFilm({ renderer, quality = {} } = {}) {
     started = true;
     finished = true;
     paused = false;
+    jumpTo();
   }
+
+  /**
+   * A jump (seek, skip): the compile chain serves the programs the film draws at its current time
+   * first (see compileWhenIdle), so a jump far ahead does not wait for everything before it while
+   * the film holds its last frame — in a lab still, nothing at all (a black frame).
+   */
+  function jumpTo() {
+    if (allLinked || !built || lost || disposed || !saved) return;
+    if (!compiling) compileWhenIdle(true);
+  }
+
 
   function replay() {
     time = 0;
@@ -830,6 +871,18 @@ function lightOf(focusLight) {
     list.push({ scale: Number(g.scale), intensity: Number(g.intensity) * dim, core: g.core, halo: g.halo, rays: Number(g.rays) || 0 });
   }
   return list.length ? list : null;
+}
+
+/** Display-space (sRGB, 0..1) colour of a linear rgb triple, or null. */
+function srgbOf(c) {
+  if (!c || c.length < 3) return null;
+  const out = [];
+  for (let k = 0; k < 3; k++) {
+    const v = Math.max(0, Math.min(1, Number(c[k])));
+    if (!Number.isFinite(v)) return null;
+    out.push(v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
+  }
+  return Math.max(out[0], out[1], out[2]) > 0.02 ? out : null;
 }
 
 /** A usable handover point [x, y, z] (finite, not at the camera's eye C), or null. */

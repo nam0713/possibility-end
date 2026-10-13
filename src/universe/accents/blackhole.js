@@ -1,12 +1,13 @@
-// Ch.7 black hole: an event horizon that occludes what lies behind it, an ice-white Keplerian accretion
-// disc (white-hot rim, pale ice, deep-blue outskirts) with Doppler beaming, and a lensed image of the disc's far side arching over and under the
-// shadow (with a thin photon ring). As reading progresses the disc and the lensed light fade and the
-// horizon shrinks: it evaporates.
+// Ch.7 black hole: an event horizon that occludes what lies behind it, a Keplerian accretion disc
+// coloured by the blackbody at its local temperature (T ∝ r^−¾: white-hot at the inner edge, orange,
+// then dull orange-red outside), relativistically Doppler-shifted and beamed — the approaching side is
+// hotter-looking (bluer) and brighter (δ³), the receding side redder and dimmer — and a lensed image of
+// the disc's far side arching over and under the shadow, with a thin white-hot photon ring. As reading
+// progresses the disc and the lensed light fade and the horizon shrinks: it evaporates.
 
 import * as THREE from 'three';
-import { C } from '../config.js';
 import { HOLE } from '../formations/universe.js';
-import { keep } from '../formations/common.js';
+import { blackbodyGlsl } from '../math.js';
 import { HOLE_UNIFORMS, holeChunk, timeChunk } from '../particles/shaders.js';
 import { additive, billboard } from './materials.js';
 
@@ -36,15 +37,14 @@ ${timeChunk}
 uniform float uTime;
 uniform float uOpacity;
 uniform vec2 uRange;
-uniform vec3 uHot;
-uniform vec3 uMid;
-uniform vec3 uCool;
+uniform vec4 uThermal;   // x: inner temperature (K) at radius y, z: orbital speed (v/c) there, w: gain
 varying vec2 vPolar;
 varying float vBeam;
 varying vec3 vView;
 #ifdef OVERLAY
 ${holeChunk}
 #endif
+${blackbodyGlsl()}
 void main() {
   float k = 1.0;
   #ifdef OVERLAY
@@ -61,9 +61,15 @@ void main() {
   float rings = 0.55 + 0.45 * sin(r * 46.0 + sin(a * 3.0) * 0.6);
   float streak = 0.6 + 0.4 * sin(a * 7.0 + r * 9.0) * sin(a * 3.0 - r * 21.0);
   float profile = smoothstep(0.0, 0.06, t) * pow(1.0 - t, 1.6);
-  vec3 col = t < 0.3 ? mix(uHot, uMid, t / 0.3) : mix(uMid, uCool, (t - 0.3) / 0.7);
-  float beam = pow(1.0 + 0.62 * vBeam, 3.0);
-  gl_FragColor = vec4(col * (profile * rings * streak * beam * uOpacity * k), 1.0);
+  // Thin-disc temperature, then the relativistic Doppler factor δ = 1 / (γ (1 − β cos θ)) of the
+  // Keplerian orbit (β ∝ r^−½): the observed temperature is δ T and the light is boosted by δ³.
+  float x = max(r, uThermal.y * 0.9) / uThermal.y;
+  float T = uThermal.x * pow(x, -0.75);
+  float beta = uThermal.z * inversesqrt(x);
+  float delta = sqrt(1.0 - beta * beta) / (1.0 - beta * vBeam);
+  vec3 col = blackbody(T * delta) * (0.35 + 0.65 * T / uThermal.x);
+  float beam = delta * delta * delta;
+  gl_FragColor = vec4(col * (profile * rings * streak * beam * uThermal.w * uOpacity * k), 1.0);
 }
 `;
 
@@ -92,9 +98,9 @@ uniform float uOpacity;
 uniform float uBand;
 uniform float uExtent;
 uniform float uTime;
-uniform vec3 uHot;
-uniform vec3 uMid;
+uniform vec4 uThermal;   // x: the disc's inner temperature (K), y: arc temperature (× x), z: Doppler β, w: gain
 varying vec2 vUv;
+${blackbodyGlsl()}
 void main() {
   vec2 q = vUv * uExtent;            // in shadow radii
   float r = length(q);
@@ -106,11 +112,17 @@ void main() {
   // Lensed far side of the disc: a thick arc over the top, a thinner one beneath.
   float arcTop = exp(-pow((r - 1.42) / 0.26, 2.0)) * smoothstep(-0.35, 0.85, up);
   float arcBottom = exp(-pow((r - 1.22) / 0.12, 2.0)) * smoothstep(0.1, -0.9, up) * 0.55;
-  float doppler = 1.0 + 0.45 * (-q.x / max(r, 1e-3));
+  // The approaching side (−x, as the disc turns) is Doppler-boosted: bluer and brighter.
+  float side = -q.x / max(r, 1e-3);
+  float delta = sqrt(1.0 - uThermal.z * uThermal.z) / (1.0 - uThermal.z * side);
   float shimmer = 0.85 + 0.15 * sin(atan(q.y, q.x) * 9.0 - uTime * qRate(0.8));
-  vec3 col = uHot * photon + mix(uMid, uHot, 0.35) * (arcTop + arcBottom) * doppler * shimmer;
+  // The photon ring is the inner disc's light, white-hot; the arcs are the lensed far side, a little
+  // cooler (they show the disc a little further out).
+  vec3 ring = blackbody(uThermal.x * delta) * photon * (0.75 + 0.25 * delta * delta);
+  vec3 arcs = blackbody(uThermal.x * uThermal.y * delta) * 0.42 * (arcTop + arcBottom) * delta * delta * delta * shimmer;
   float glow = exp(-(r - 1.0) * 2.6) * 0.05;
-  col += uMid * glow;
+  vec3 col = ring * 0.75 + arcs + blackbody(uThermal.x * uThermal.y) * 0.22 * glow;
+  col *= uThermal.w;
   gl_FragColor = vec4(col * uOpacity * (1.0 - smoothstep(uExtent * 0.75, uExtent, r)), 1.0);
 }
 `;
@@ -129,9 +141,7 @@ export class BlackHoleAccent {
       uTime: { value: 0 },
       uOpacity: { value: 0 },
       uRange: { value: new THREE.Vector2(r0 * 0.92, r1 * 1.05) },
-      uHot: { value: new THREE.Vector3(...C.iceHi).multiplyScalar(0.9) },
-      uMid: { value: new THREE.Vector3(...keep(C.white, C.ice, 0.5)).multiplyScalar(0.5) },
-      uCool: { value: new THREE.Vector3(...C.deep).multiplyScalar(0.3) },
+      uThermal: { value: new THREE.Vector4(HOLE.tIn, r0, 0.45, 1.25) },
     };
     this.disc = new THREE.Mesh(discGeo, new THREE.ShaderMaterial({ name: 'AccretionDisc', uniforms: this.discUniforms, vertexShader: discVertex, fragmentShader: discFragment, ...additive, side: THREE.DoubleSide }));
     this.disc.renderOrder = 6;
@@ -145,8 +155,7 @@ export class BlackHoleAccent {
       uBand: { value: 1 },
       uExtent: { value: extent },
       uTime: { value: 0 },
-      uHot: { value: new THREE.Vector3(...C.iceHi).multiplyScalar(0.75) },
-      uMid: { value: new THREE.Vector3(...C.ice).multiplyScalar(0.42) },
+      uThermal: { value: new THREE.Vector4(HOLE.tIn, 0.72, 0.3, 1) },
     };
     this.lens = new THREE.Mesh(billboard.quad, new THREE.ShaderMaterial({ name: 'LensedRing', uniforms: this.lensUniforms, vertexShader: billboard.vertex, fragmentShader: lensFragment, ...additive }));
     this.lens.frustumCulled = false;

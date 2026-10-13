@@ -1,10 +1,13 @@
 // Ch.5 에너지 ENERGY — a star wrapped by a Dyson swarm: "수조 개의 독립된 구조물이 항성을 둘러싼다".
 // Collectors ride hundreds of independent inclined orbits in several shells (Keplerian speeds:
 // inner shells race, outer shells drift), a few radiators glint as they turn. A pale wind leaves
-// the star. The swarm fills in as you read. The star itself is an accent: a blue-white granulated
-// sphere + corona. Collectors near the star run white-hot, the outer shells cool to ice and deep blue.
+// the star. The swarm fills in as you read. The star itself is an accent: a sun-like 5800 K photosphere
+// (blackbody granulation and limb darkening, a pearly corona). The swarm is ice structure catching the
+// star's light: collectors near it are lit a warm white, the outer shells fall back to ice and deep
+// blue; radiators glint with reflected sunlight; photosphere sparks and the wind carry the star's own
+// colour.
 
-import { C, HEX } from '../config.js';
+import { C, K, kelvinHex } from '../config.js';
 import { TAU, basisFromNormal } from '../math.js';
 import { mix, unitVector } from './common.js';
 
@@ -16,7 +19,7 @@ export default {
   radius: 2.7,
   center: [0, 0, 0],
   view: { yaw: 0.0, pitch: 0.3 },
-  tint: HEX.ice,
+  tint: kelvinHex(K.yellow),
   morph: 'chapter',
   // The swarm fills in as you read, from a cover that already reads as a swarm (two thirds).
   reading: { preview: 0.9, evolve: [0.7, 1.0], mode: 1 },
@@ -38,6 +41,9 @@ export default {
       rings.push({ n: [nx / l, ny / l, nz / l], r, dir: b.rng() < 0.8 ? 1 : -1, trains: 1 + Math.floor(b.rng() * 4), phase: b.rng() * TAU, weight: 0.6 + b.rng() * 0.8 });
     }
     const ringBudget = b.quota(0.5);
+    // A collector facing the star reflects its light: ice material, lit warm white.
+    const sunlit = [0, 0, 0];
+    for (let c = 0; c < 3; c++) sunlit[c] = C.white[c] * 0.45 + C.sun[c] * 0.55;
     const totalW = rings.reduce((acc, R) => acc + R.weight * R.r, 0);
     for (const R of rings) {
       const count = Math.round((ringBudget * R.weight * R.r) / totalW);
@@ -58,7 +64,7 @@ export default {
         const z = basis[2] * ca + basis[5] * sa + R.n[2] * off;
         const heat = Math.pow(0.9 / R.r, 2);
         const radiator = b.rng() < 0.05;
-        const i = b.point(x, y, z, mix(mix(C.ice, C.deep, 0.25), C.iceHi, Math.min(1, heat) * 0.75), radiator ? 0.5 : (0.12 + 0.14 * b.rng()) * (0.7 + 0.5 * heat), radiator ? 0.016 : 0.0075 + 0.005 * b.rng());
+        const i = b.point(x, y, z, radiator ? C.sun : mix(mix(C.ice, C.deep, 0.25), sunlit, Math.min(1, heat) * 0.75), radiator ? 0.5 : (0.12 + 0.14 * b.rng()) * (0.7 + 0.5 * heat), radiator ? 0.016 : 0.0075 + 0.005 * b.rng());
         b.orbit(i, R.n[0], R.n[1], R.n[2], R.dir * 0.3 / Math.pow(R.r, 1.5));
         b.evolve(i, 0.2 + b.rng() * 0.78);
         if (radiator) b.glint(i, 1);
@@ -86,19 +92,19 @@ export default {
       if (b.tick()) yield;
       unitVector(b, n);
       const r = STAR_RADIUS * (1.02 + Math.abs(b.gauss()) * 0.08);
-      const i = b.point(n[0] * r, n[1] * r, n[2] * r, mix(C.iceHi, C.ice, b.rng() * 0.6), 0.18, 0.016);
+      const i = b.point(n[0] * r, n[1] * r, n[2] * r, mix(C.core, C.sun, b.rng() * 0.7), 0.18, 0.016);
       b.orbit(i, 0, 1, 0, 0.12);
       b.twinkle(i, 0.6);
     }
 
-    // Stellar wind: faint pale streams leaving the star.
+    // Stellar wind: faint streams of the star's light leaving it.
     const wind = b.quota(0.06);
     for (let k = 0; k < wind; k++) {
       if (b.tick()) yield;
       unitVector(b, n);
       const r0 = STAR_RADIUS * 1.15;
       const len = 0.8 + b.rng() * 1.6;
-      const i = b.point(n[0] * r0, n[1] * r0, n[2] * r0, mix(C.ice, C.deep, b.rng()), 0.05, 0.012);
+      const i = b.point(n[0] * r0, n[1] * r0, n[2] * r0, C.sun, 0.02 + 0.03 * b.rng(), 0.012);
       b.flow(i, n[0] * len, n[1] * len, n[2] * len, 0.06 + 0.06 * b.rng());
     }
 
